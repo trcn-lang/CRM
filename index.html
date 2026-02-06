@@ -171,7 +171,7 @@
   <script>
     let tasksData = [];
     let mappedColumns = {};
-    let tableId = null;
+    let sourceTableId = null;
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
@@ -189,22 +189,20 @@
       ]
     });
     
-    // Obtenir l'ID de la table
-    grist.onOptions(function(options, interaction) {
-      if (interaction.tableId) {
-        tableId = interaction.tableId;
-        console.log('Table ID:', tableId);
-      }
-    });
-    
     // Charger les données des tâches
     grist.onRecords(function(records, mappings) {
       try {
         mappedColumns = mappings;
         
+        // Essayer de récupérer le tableId depuis les records
+        if (records && records.length > 0 && records[0]._table) {
+          sourceTableId = records[0]._table;
+        }
+        
         console.log('=== DEBUG DÉMARRAGE ===');
         console.log('Nombre de records:', records.length);
         console.log('Mappings:', mappings);
+        console.log('Source Table ID:', sourceTableId);
         
         // Mapper les tâches
         tasksData = records.map(record => {
@@ -383,6 +381,7 @@
           console.log('Task ID:', taskId);
           console.log('Ancien statut:', task.statut);
           console.log('Nouveau statut:', newStatut);
+          console.log('Source Table ID:', sourceTableId);
           console.log('Mapped Columns:', mappedColumns);
           console.log('Statut column mapping:', mappedColumns.Statut);
           
@@ -393,9 +392,25 @@
             return;
           }
           
+          // Vérifier que le tableId existe
+          if (!sourceTableId) {
+            showError('Erreur : impossible de déterminer l\'ID de la table');
+            console.error('sourceTableId est null');
+            
+            // Essayer de mettre à jour sans le tableId (méthode alternative)
+            try {
+              await grist.setCursorPos({ rowId: taskId });
+              showError('Veuillez changer manuellement le statut à : ' + newStatut);
+              return;
+            } catch (e) {
+              console.error('Impossible d\'ouvrir la ligne:', e);
+            }
+            return;
+          }
+          
           try {
             await grist.docApi.applyUserActions([
-              ['UpdateRecord', tableId, taskId, { 
+              ['UpdateRecord', sourceTableId, taskId, { 
                 [mappedColumns.Statut]: newStatut 
               }]
             ]);
@@ -407,6 +422,14 @@
           } catch (error) {
             showError('Erreur: ' + error.message);
             console.error('Erreur détaillée:', error);
+            
+            // Fallback : ouvrir la ligne pour modification manuelle
+            try {
+              await grist.setCursorPos({ rowId: taskId });
+              showError('Veuillez changer manuellement le statut à : ' + newStatut);
+            } catch (e) {
+              console.error('Impossible d\'ouvrir la ligne:', e);
+            }
           }
         };
         
