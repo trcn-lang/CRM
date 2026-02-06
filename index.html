@@ -1,1 +1,674 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban CRM</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f5f7fa;
+      padding: 16px;
+      overflow-x: auto;
+    }
+    
+    .kanban-container {
+      display: flex;
+      gap: 16px;
+      min-width: fit-content;
+    }
+    
+    .kanban-column {
+      background: #fff;
+      border-radius: 8px;
+      width: 320px;
+      padding: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    .column-header {
+      font-weight: 600;
+      font-size: 15px;
+      color: #1e3a5f;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid #2563eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .task-count {
+      background: #2563eb;
+      color: white;
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .tasks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 120px;
+      margin-bottom: 12px;
+    }
+    
+    .task-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .task-card:hover {
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+      border-color: #2563eb;
+      transform: translateY(-2px);
+    }
+    
+    .task-partenaire {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .task-title {
+      font-weight: 700;
+      color: #1e3a5f;
+      font-size: 14px;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    
+    .task-meta {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    
+    .task-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    
+    .add-task-btn {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .add-task-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #64748b;
+      font-size: 14px;
+    }
+    
+    .info-banner {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border: 1px solid #93c5fd;
+      color: #1e40af;
+      padding: 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      width: 90%;
+      max-width: 550px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+    
+    .modal-header {
+      font-size: 22px;
+      font-weight: 800;
+      color: #1e3a5f;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid #e2e8f0;
+    }
+    
+    .form-group {
+      margin-bottom: 18px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 8px;
+    }
+    
+    .form-label.required::after {
+      content: " *";
+      color: #dc2626;
+    }
+    
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: white;
+      transition: all 0.2s;
+    }
+    
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 2px solid #e2e8f0;
+    }
+    
+    .btn {
+      padding: 13px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+    }
+    
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+    
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+    
+    .success-toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 14px 24px;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+      display: none;
+      z-index: 2000;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .success-toast.show {
+      display: block;
+      animation: slideIn 0.4s ease;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    .error-message {
+      background: #fee;
+      border: 1px solid #fcc;
+      color: #c00;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">⏳ Chargement du Kanban...</div>
+  <div id="success-toast" class="success-toast"></div>
+  
+  <div id="kanban-wrapper" style="display: none;">
+    <div class="info-banner">
+      💡 <strong>Cliquez sur une carte</strong> pour modifier • <strong>Bouton +</strong> pour créer une nouvelle tâche
+    </div>
+    <div id="kanban" class="kanban-container"></div>
+  </div>
+  
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header" id="modal-title">Modifier la tâche</div>
+      <div id="modal-error" class="error-message"></div>
+      <form id="task-form">
+        <div class="form-group">
+          <label class="form-label required">📋 Tâche</label>
+          <input type="text" id="input-tache" class="form-input" placeholder="Nom de la tâche" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">🤝 Partenaire</label>
+          <select id="input-partenaire" class="form-select" required>
+            <option value="">Sélectionnez un partenaire</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">🎯 Événement</label>
+          <select id="input-evenement" class="form-select" required>
+            <option value="">Sélectionnez un événement</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">📊 Statut</label>
+          <select id="input-statut" class="form-select" required>
+            <option value="">Sélectionnez un statut</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">📅 Échéance</label>
+          <input type="date" id="input-echeance" class="form-input">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">👤 Porteur</label>
+          <select id="input-porteur" class="form-select">
+            <option value="">Aucun</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">📄 Description</label>
+          <textarea id="input-description" class="form-textarea" placeholder="Détails de la tâche..."></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+          <button type="submit" class="btn btn-primary">💾 Sauvegarder</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <script>
+    let tasksData = [];
+    let partenairesData = [];
+    let evenementsData = [];
+    let statutsChoices = [];
+    let porteursChoices = [];
+    let currentTaskId = null;
+    let isNewTask = false;
+    let newTaskStatut = null;
+    
+    grist.ready({ requiredAccess: 'full' });
+    
+    // Charger toutes les données
+    async function loadAllData() {
+      try {
+        // Charger les tâches
+        const tasksResult = await grist.docApi.fetchTable('Taches');
+        tasksData = tasksResult.id.map((id, i) => ({
+          id: id,
+          Tache: tasksResult.Tache?.[i] || '',
+          Partenaire: tasksResult.Partenaire?.[i] || null,
+          Evenement: tasksResult.Evenement?.[i] || null,
+          Statut: tasksResult.Statut?.[i] || 'À faire',
+          Echeance: tasksResult.Echeance?.[i] || null,
+          Porteur: tasksResult.Porteur?.[i] || null,
+          Description: tasksResult.Description?.[i] || ''
+        }));
+        
+        // Charger les partenaires
+        const partenairesResult = await grist.docApi.fetchTable('Partenaires');
+        partenairesData = partenairesResult.id.map((id, i) => ({
+          id: id,
+          Partenaire: partenairesResult.Partenaire?.[i] || ''
+        }));
+        
+        // Charger les événements
+        const evenementsResult = await grist.docApi.fetchTable('Evenements');
+        evenementsData = evenementsResult.id.map((id, i) => ({
+          id: id,
+          Evenement: evenementsResult.Evenement?.[i] || ''
+        }));
+        
+        // Récupérer les choix pour Statut et Porteur depuis les métadonnées
+        const tablesResult = await grist.docApi.fetchTable('_grist_Tables_column');
+        
+        // Trouver les colonnes Statut et Porteur
+        const statutCol = tablesResult.colId.findIndex(c => c === 'Statut');
+        const porteurCol = tablesResult.colId.findIndex(c => c === 'Porteur');
+        
+        if (statutCol !== -1) {
+          const widgetOptions = tablesResult.widgetOptions?.[statutCol];
+          if (widgetOptions) {
+            try {
+              const parsed = JSON.parse(widgetOptions);
+              statutsChoices = parsed.choices || ['À faire', 'En cours', 'Terminé'];
+            } catch (e) {
+              statutsChoices = ['À faire', 'En cours', 'Terminé'];
+            }
+          } else {
+            statutsChoices = ['À faire', 'En cours', 'Terminé'];
+          }
+        } else {
+          statutsChoices = ['À faire', 'En cours', 'Terminé'];
+        }
+        
+        if (porteurCol !== -1) {
+          const widgetOptions = tablesResult.widgetOptions?.[porteurCol];
+          if (widgetOptions) {
+            try {
+              const parsed = JSON.parse(widgetOptions);
+              porteursChoices = parsed.choices || [];
+            } catch (e) {
+              porteursChoices = [];
+            }
+          }
+        }
+        
+        renderKanban();
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('kanban-wrapper').style.display = 'block';
+        
+      } catch (error) {
+        console.error('Erreur chargement:', error);
+        document.getElementById('loading').innerHTML = '❌ Erreur de chargement: ' + error.message;
+      }
+    }
+    
+    loadAllData();
+    
+    // Écouter les changements de données
+    grist.onRecords(function() {
+      loadAllData();
+    });
+    
+    function renderKanban() {
+      const container = document.getElementById('kanban');
+      container.innerHTML = '';
+      
+      statutsChoices.forEach(statut => {
+        const column = document.createElement('div');
+        column.className = 'kanban-column';
+        
+        const tasks = tasksData.filter(t => t.Statut === statut);
+        
+        column.innerHTML = `
+          <div class="column-header">
+            <span>${statut}</span>
+            <span class="task-count">${tasks.length}</span>
+          </div>
+          <div class="tasks-list"></div>
+          <button class="add-task-btn" onclick="openNewTaskModal('${statut}')">+ Nouvelle tâche</button>
+        `;
+        
+        const tasksList = column.querySelector('.tasks-list');
+        tasks.forEach(task => {
+          const card = document.createElement('div');
+          card.className = 'task-card';
+          card.onclick = () => openModal(task);
+          
+          const partenaireNom = getPartenaireName(task.Partenaire);
+          const evenementNom = getEvenementName(task.Evenement);
+          const echeance = task.Echeance ? formatDate(task.Echeance) : 'Non définie';
+          const porteur = task.Porteur || 'Non assigné';
+          
+          card.innerHTML = `
+            <div class="task-partenaire">🤝 ${partenaireNom}</div>
+            <div class="task-title">${task.Tache}</div>
+            <div class="task-meta">
+              <div class="task-meta-row">🎯 ${evenementNom}</div>
+              <div class="task-meta-row">📅 ${echeance}</div>
+              <div class="task-meta-row">👤 ${porteur}</div>
+            </div>
+          `;
+          
+          tasksList.appendChild(card);
+        });
+        
+        container.appendChild(column);
+      });
+    }
+    
+    function getPartenaireName(id) {
+      const p = partenairesData.find(p => p.id === id);
+      return p ? p.Partenaire : 'Non défini';
+    }
+    
+    function getEvenementName(id) {
+      const e = evenementsData.find(e => e.id === id);
+      return e ? e.Evenement : 'Non défini';
+    }
+    
+    function openNewTaskModal(statut) {
+      isNewTask = true;
+      newTaskStatut = statut;
+      currentTaskId = null;
+      
+      document.getElementById('modal-title').textContent = 'Nouvelle tâche';
+      document.getElementById('task-form').reset();
+      populateSelects();
+      document.getElementById('input-statut').value = statut;
+      document.getElementById('modal-error').style.display = 'none';
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function openModal(task) {
+      isNewTask = false;
+      currentTaskId = task.id;
+      
+      document.getElementById('modal-title').textContent = 'Modifier la tâche';
+      populateSelects();
+      
+      document.getElementById('input-tache').value = task.Tache || '';
+      document.getElementById('input-partenaire').value = task.Partenaire || '';
+      document.getElementById('input-evenement').value = task.Evenement || '';
+      document.getElementById('input-statut').value = task.Statut || '';
+      document.getElementById('input-echeance').value = task.Echeance ? formatDateInput(task.Echeance) : '';
+      document.getElementById('input-porteur').value = task.Porteur || '';
+      document.getElementById('input-description').value = task.Description || '';
+      
+      document.getElementById('modal-error').style.display = 'none';
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function populateSelects() {
+      // Partenaires
+      const partenaireSelect = document.getElementById('input-partenaire');
+      partenaireSelect.innerHTML = '<option value="">Sélectionnez un partenaire</option>';
+      partenairesData.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.Partenaire;
+        partenaireSelect.appendChild(option);
+      });
+      
+      // Événements
+      const evenementSelect = document.getElementById('input-evenement');
+      evenementSelect.innerHTML = '<option value="">Sélectionnez un événement</option>';
+      evenementsData.forEach(e => {
+        const option = document.createElement('option');
+        option.value = e.id;
+        option.textContent = e.Evenement;
+        evenementSelect.appendChild(option);
+      });
+      
+      // Statuts
+      const statutSelect = document.getElementById('input-statut');
+      statutSelect.innerHTML = '<option value="">Sélectionnez un statut</option>';
+      statutsChoices.forEach(s => {
+        const option = document.createElement('option');
+        option.value = s;
+        option.textContent = s;
+        statutSelect.appendChild(option);
+      });
+      
+      // Porteurs
+      const porteurSelect = document.getElementById('input-porteur');
+      porteurSelect.innerHTML = '<option value="">Aucun</option>';
+      porteursChoices.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p;
+        option.textContent = p;
+        porteurSelect.appendChild(option);
+      });
+    }
+    
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+      currentTaskId = null;
+      isNewTask = false;
+      newTaskStatut = null;
+    }
+    
+    // Sauvegarde
+    document.getElementById('task-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const updates = {
+        Tache: document.getElementById('input-tache').value,
+        Partenaire: parseInt(document.getElementById('input-partenaire').value) || null,
+        Evenement: parseInt(document.getElementById('input-evenement').value) || null,
+        Statut: document.getElementById('input-statut').value,
+        Echeance: document.getElementById('input-echeance').value || null,
+        Porteur: document.getElementById('input-porteur').value || null,
+        Description: document.getElementById('input-description').value
+      };
+      
+      // Validation
+      if (!updates.Tache || !updates.Partenaire || !updates.Evenement || !updates.Statut) {
+        document.getElementById('modal-error').textContent = '⚠️ Veuillez remplir tous les champs obligatoires';
+        document.getElementById('modal-error').style.display = 'block';
+        return;
+      }
+      
+      try {
+        if (isNewTask) {
+          // Créer nouvelle tâche
+          await grist.docApi.applyUserActions([
+            ['AddRecord', 'Taches', null, updates]
+          ]);
+          showSuccess('✅ Tâche créée !');
+        } else {
+          // Mettre à jour tâche existante
+          await grist.docApi.applyUserActions([
+            ['BulkUpdateRecord', 'Taches', [currentTaskId], updates]
+          ]);
+          showSuccess('✅ Tâche mise à jour !');
+        }
+        
+        closeModal();
+        await loadAllData();
+        
+      } catch (error) {
+        console.error('Erreur sauvegarde:', error);
+        document.getElementById('modal-error').textContent = '❌ Erreur: ' + error.message;
+        document.getElementById('modal-error').style.display = 'block';
+      }
+    });
+    
+    function formatDate(dateValue) {
+      if (!dateValue) return 'Non définie';
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return 'Non définie';
+      return date.toLocaleDateString('fr-FR');
+    }
+    
+    function formatDateInput(dateValue) {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    }
+    
+    function showSuccess(message) {
+      const toast = document.getElementById('success-toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+    
+    // Fermer modal en cliquant dehors
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+  </script>
+</body>
+</html>
