@@ -35,14 +35,6 @@
       border-radius: 8px;
       border: 1px solid #bfdbfe;
     }
-    .error {
-      background: #fee;
-      padding: 15px;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: 1px solid #fcc;
-      color: #c00;
-    }
     pre {
       background: #1e293b;
       color: #e2e8f0;
@@ -141,29 +133,46 @@
       log('🔑 Row ID:', rowId);
       log('🗺️ Mappings disponibles:', mappings);
       
-      // Méthode 1 : Via docApi.applyUserActions
+      // Méthode 1 : Via docApi.applyUserActions - TESTER TOUS LES NOMS
       try {
         log('🔄 Essai Méthode 1: docApi.applyUserActions');
         
-        const tableName = '4. Tâches'; // NOM EXACT de votre table
-        const columnName = mappings && mappings.Statut ? mappings.Statut : 'Statut';
+        // TESTER DIFFÉRENTS NOMS
+        const possibleNames = [
+          '4. Tâches',
+          '4.Tâches',
+          '4. Taches',
+          '4.Taches',
+          'Tâches',
+          'Taches',
+          '4_Tâches',
+          '4_Taches'
+        ];
         
-        log('📋 Paramètres:', { tableName, columnName, rowId, newStatus });
+        for (const tableName of possibleNames) {
+          try {
+            const columnName = mappings && mappings.Statut ? mappings.Statut : 'Statut';
+            
+            log(`🧪 Test avec nom: "${tableName}"`);
+            
+            await grist.docApi.applyUserActions([
+              ['UpdateRecord', tableName, rowId, { 
+                [columnName]: newStatus 
+              }]
+            ]);
+            
+            log(`✅ ✅ ✅ SUCCÈS avec le nom: "${tableName}" ✅ ✅ ✅`);
+            return;
+            
+          } catch (e) {
+            log(`❌ Échec avec "${tableName}": ${e.message}`);
+          }
+        }
         
-        await grist.docApi.applyUserActions([
-          ['UpdateRecord', tableName, rowId, { 
-            [columnName]: newStatus 
-          }]
-        ]);
-        
-        log('✅ Méthode 1 RÉUSSIE !');
-        return;
+        log('❌ Toutes les variantes ont échoué');
         
       } catch (error) {
-        log('❌ Méthode 1 échouée:', {
-          message: error.message,
-          stack: error.stack
-        });
+        log('❌ Erreur générale:', error);
       }
       
       // Méthode 2 : Via setCursorPos (fallback)
