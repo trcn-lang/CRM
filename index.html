@@ -191,19 +191,64 @@
       try {
         mappedColumns = mappings;
         
+        console.log('=== DEBUG DÉMARRAGE ===');
+        console.log('Nombre de records:', records.length);
+        console.log('Mappings:', mappings);
+        
         // Mapper les tâches
         tasksData = records.map(record => {
           const mapped = grist.mapColumnNames(record, mappings);
+          
+          // DEBUG : voir ce que Grist retourne
+          console.log('---');
+          console.log('Record ID:', record.id);
+          console.log('Tâche:', mapped.Tâche);
+          console.log('Statut brut:', mapped.Statut);
+          console.log('Type de Statut:', typeof mapped.Statut);
+          console.log('Statut est null?', mapped.Statut === null);
+          console.log('Statut est undefined?', mapped.Statut === undefined);
+          console.log('Statut vide?', mapped.Statut === '');
+          
+          // Normaliser le statut
+          let statutFinal = mapped.Statut || 'À faire';
+          
+          // Si c'est un tableau (cas de certains widgets)
+          if (Array.isArray(statutFinal)) {
+            statutFinal = statutFinal[0] || 'À faire';
+          }
+          
+          // Nettoyer les espaces
+          if (typeof statutFinal === 'string') {
+            statutFinal = statutFinal.trim();
+          }
+          
+          console.log('Statut final utilisé:', statutFinal);
+          
           return {
             id: record.id,
             tache: mapped.Tâche || '',
             evenement: mapped.Evènement || null,
-            statut: mapped.Statut || 'À faire',
+            statut: statutFinal,
             echeance: mapped.Echéance || null,
             porteur: mapped.Porteur || '',
             description: mapped.Description || ''
           };
         });
+        
+        console.log('=== RÉSUMÉ TÂCHES ===');
+        console.log('Tâches par statut:');
+        STATUTS.forEach(statut => {
+          const count = tasksData.filter(t => t.statut === statut).length;
+          console.log(`  ${statut}: ${count} tâches`);
+        });
+        
+        const autresStatuts = tasksData.filter(t => !STATUTS.includes(t.statut));
+        if (autresStatuts.length > 0) {
+          console.log('⚠️ Tâches avec statuts non reconnus:');
+          autresStatuts.forEach(t => {
+            console.log(`  - ID ${t.id}: "${t.statut}"`);
+          });
+        }
         
         renderKanban();
         document.getElementById('loading').style.display = 'none';
@@ -333,6 +378,13 @@
         return;
       }
       
+      console.log('=== TENTATIVE DE MISE À JOUR ===');
+      console.log('Task ID:', taskId);
+      console.log('Ancien statut:', task.statut);
+      console.log('Nouveau statut:', newStatut);
+      console.log('Table ID:', tableId);
+      console.log('Mapping Statut:', mappedColumns.Statut);
+      
       try {
         // Méthode 1 : Essayer avec docApi
         try {
@@ -345,9 +397,10 @@
           task.statut = newStatut;
           showSuccess(`Statut changé : ${newStatut} ✓`);
           renderKanban();
+          console.log('✓ Méthode 1 réussie');
           return;
         } catch (e) {
-          console.log('Méthode 1 échouée, essai méthode 2:', e);
+          console.log('✗ Méthode 1 échouée:', e.message);
         }
         
         // Méthode 2 : Utiliser setters si disponibles
@@ -359,14 +412,16 @@
           task.statut = newStatut;
           showSuccess(`Statut changé : ${newStatut} ✓`);
           renderKanban();
+          console.log('✓ Méthode 2 réussie');
           return;
         } catch (e) {
-          console.log('Méthode 2 échouée, essai méthode 3:', e);
+          console.log('✗ Méthode 2 échouée:', e.message);
         }
         
         // Méthode 3 : Sélectionner et demander à l'utilisateur
         await grist.setCursorPos({ rowId: taskId });
         showError('Veuillez changer le statut manuellement dans Grist à : ' + newStatut);
+        console.log('✗ Toutes les méthodes ont échoué, action manuelle requise');
         
       } catch (error) {
         showError('Erreur: ' + error.message);
