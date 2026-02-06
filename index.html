@@ -175,7 +175,7 @@
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
-    // Initialisation - AJOUT DE PARTENAIRE
+    // Initialisation
     grist.ready({
       requiredAccess: 'full',
       columns: [
@@ -209,12 +209,6 @@
         // Mapper les tâches
         tasksData = records.map(record => {
           const mapped = grist.mapColumnNames(record, mappings);
-          
-          console.log('---');
-          console.log('Record ID:', record.id);
-          console.log('Tâche:', mapped.Tâche);
-          console.log('Partenaire:', mapped.Partenaire);
-          console.log('Statut brut:', mapped.Statut);
           
           // Normaliser le statut
           let statutFinal = mapped.Statut || 'À faire';
@@ -389,6 +383,15 @@
           console.log('Task ID:', taskId);
           console.log('Ancien statut:', task.statut);
           console.log('Nouveau statut:', newStatut);
+          console.log('Mapped Columns:', mappedColumns);
+          console.log('Statut column mapping:', mappedColumns.Statut);
+          
+          // Vérifier que le mapping existe
+          if (!mappedColumns.Statut) {
+            showError('Erreur de configuration : la colonne Statut n\'est pas mappée correctement');
+            console.error('mappedColumns.Statut est null ou undefined');
+            return;
+          }
           
           try {
             await grist.docApi.applyUserActions([
