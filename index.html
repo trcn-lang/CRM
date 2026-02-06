@@ -343,16 +343,29 @@
         });
       });
       
-      // Attacher dragover et drop à toutes les listes
-      document.querySelectorAll('.tasks-list').forEach(list => {
-        list.addEventListener('dragover', function(ev) {
+      // Attacher dragover et drop à toutes les colonnes ET listes
+      document.querySelectorAll('.kanban-column').forEach(column => {
+        const list = column.querySelector('.tasks-list');
+        const statut = list.dataset.statut;
+        
+        // Accepter le drop sur toute la colonne
+        column.addEventListener('dragover', function(ev) {
           ev.preventDefault();
+          ev.dataTransfer.dropEffect = 'move';
         });
         
-        list.addEventListener('drop', async function(ev) {
+        list.addEventListener('dragover', function(ev) {
           ev.preventDefault();
+          ev.dataTransfer.dropEffect = 'move';
+        });
+        
+        // Handler de drop sur la colonne entière
+        const dropHandler = async function(ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          
           const taskId = parseInt(ev.dataTransfer.getData('taskId'));
-          const newStatut = this.dataset.statut;
+          const newStatut = statut;
           
           const card = document.querySelector(`[data-task-id="${taskId}"]`);
           if (card) card.classList.remove('dragging');
@@ -417,7 +430,10 @@
             showError('Erreur: ' + error.message);
             console.error('Erreur détaillée:', error);
           }
-        });
+        };
+        
+        column.addEventListener('drop', dropHandler);
+        list.addEventListener('drop', dropHandler);
       });
     }
     
