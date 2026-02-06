@@ -420,7 +420,7 @@
         evenementsData = evenementsResult.id.map((id, i) => ({
           id: id,
           Evenement: evenementsResult.Evenement?.[i] || '',
-          Partenaire: evenementsResult.Partenaire?.[i] || null  // ← IMPORTANT !
+          Partenaire: evenementsResult.Partenaire?.[i] || null
         }));
         
         // Récupérer les choix pour Statut et Porteur depuis les métadonnées
@@ -612,7 +612,7 @@
       });
     }
     
-    // ✨ NOUVELLE FONCTION : Filtrer les événements par partenaire
+    // Filtrer les événements par partenaire
     function updateEvenementsForPartenaire(partenaireId) {
       const evenementSelect = document.getElementById('input-evenement');
       const helper = document.getElementById('evenement-helper');
@@ -649,7 +649,7 @@
       evenementSelect.disabled = false;
     }
     
-    // ✨ Écouter les changements de partenaire
+    // Écouter les changements de partenaire
     document.getElementById('input-partenaire').addEventListener('change', function() {
       const partenaireId = this.value;
       updateEvenementsForPartenaire(partenaireId);
@@ -665,22 +665,20 @@
       newTaskStatut = null;
     }
     
-    // Sauvegarde
+    // Sauvegarde - CORRIGÉ
     document.getElementById('task-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       
-      const updates = {
-        Tache: document.getElementById('input-tache').value,
-        Partenaire: parseInt(document.getElementById('input-partenaire').value) || null,
-        Evenement: parseInt(document.getElementById('input-evenement').value) || null,
-        Statut: document.getElementById('input-statut').value,
-        Echeance: document.getElementById('input-echeance').value || null,
-        Porteur: document.getElementById('input-porteur').value || null,
-        Description: document.getElementById('input-description').value
-      };
+      const tache = document.getElementById('input-tache').value;
+      const partenaire = parseInt(document.getElementById('input-partenaire').value) || null;
+      const evenement = parseInt(document.getElementById('input-evenement').value) || null;
+      const statut = document.getElementById('input-statut').value;
+      const echeance = document.getElementById('input-echeance').value || null;
+      const porteur = document.getElementById('input-porteur').value || null;
+      const description = document.getElementById('input-description').value;
       
       // Validation
-      if (!updates.Tache || !updates.Partenaire || !updates.Evenement || !updates.Statut) {
+      if (!tache || !partenaire || !evenement || !statut) {
         document.getElementById('modal-error').textContent = '⚠️ Veuillez remplir tous les champs obligatoires';
         document.getElementById('modal-error').style.display = 'block';
         return;
@@ -688,15 +686,31 @@
       
       try {
         if (isNewTask) {
-          // Créer nouvelle tâche
+          // Créer nouvelle tâche - AddRecord n'utilise PAS de tableaux
           await grist.docApi.applyUserActions([
-            ['AddRecord', 'Taches', null, updates]
+            ['AddRecord', 'Taches', null, {
+              Tache: tache,
+              Partenaire: partenaire,
+              Evenement: evenement,
+              Statut: statut,
+              Echeance: echeance,
+              Porteur: porteur,
+              Description: description
+            }]
           ]);
           showSuccess('✅ Tâche créée !');
         } else {
-          // Mettre à jour tâche existante
+          // Mettre à jour tâche existante - BulkUpdateRecord utilise des tableaux
           await grist.docApi.applyUserActions([
-            ['BulkUpdateRecord', 'Taches', [currentTaskId], updates]
+            ['BulkUpdateRecord', 'Taches', [currentTaskId], {
+              Tache: [tache],
+              Partenaire: [partenaire],
+              Evenement: [evenement],
+              Statut: [statut],
+              Echeance: [echeance],
+              Porteur: [porteur],
+              Description: [description]
+            }]
           ]);
           showSuccess('✅ Tâche mise à jour !');
         }
