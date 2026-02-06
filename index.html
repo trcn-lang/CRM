@@ -171,7 +171,6 @@
   <script>
     let tasksData = [];
     let mappedColumns = {};
-    let sourceTableId = null;
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
@@ -194,15 +193,9 @@
       try {
         mappedColumns = mappings;
         
-        // Essayer de récupérer le tableId depuis les records
-        if (records && records.length > 0 && records[0]._table) {
-          sourceTableId = records[0]._table;
-        }
-        
         console.log('=== DEBUG DÉMARRAGE ===');
         console.log('Nombre de records:', records.length);
         console.log('Mappings:', mappings);
-        console.log('Source Table ID:', sourceTableId);
         
         // Mapper les tâches
         tasksData = records.map(record => {
@@ -355,7 +348,7 @@
           ev.dataTransfer.dropEffect = 'move';
         });
         
-        // Handler de drop sur la colonne entière
+        // Handler de drop sur la colonne entière - VERSION SIMPLIFIÉE
         const dropHandler = async function(ev) {
           ev.preventDefault();
           ev.stopPropagation();
@@ -377,59 +370,22 @@
             return;
           }
           
-          console.log('=== TENTATIVE DE MISE À JOUR ===');
+          console.log('=== DRAG & DROP ===');
           console.log('Task ID:', taskId);
           console.log('Ancien statut:', task.statut);
           console.log('Nouveau statut:', newStatut);
-          console.log('Source Table ID:', sourceTableId);
-          console.log('Mapped Columns:', mappedColumns);
-          console.log('Statut column mapping:', mappedColumns.Statut);
           
-          // Vérifier que le mapping existe
-          if (!mappedColumns.Statut) {
-            showError('Erreur de configuration : la colonne Statut n\'est pas mappée correctement');
-            console.error('mappedColumns.Statut est null ou undefined');
-            return;
-          }
+          // Mettre à jour localement pour l'affichage immédiat
+          task.statut = newStatut;
+          renderKanban();
           
-          // Vérifier que le tableId existe
-          if (!sourceTableId) {
-            showError('Erreur : impossible de déterminer l\'ID de la table');
-            console.error('sourceTableId est null');
-            
-            // Essayer de mettre à jour sans le tableId (méthode alternative)
-            try {
-              await grist.setCursorPos({ rowId: taskId });
-              showError('Veuillez changer manuellement le statut à : ' + newStatut);
-              return;
-            } catch (e) {
-              console.error('Impossible d\'ouvrir la ligne:', e);
-            }
-            return;
-          }
-          
+          // Ouvrir la ligne dans Grist pour que l'utilisateur valide
           try {
-            await grist.docApi.applyUserActions([
-              ['UpdateRecord', sourceTableId, taskId, { 
-                [mappedColumns.Statut]: newStatut 
-              }]
-            ]);
-            
-            task.statut = newStatut;
-            showSuccess(`Statut changé : ${newStatut} ✓`);
-            renderKanban();
-            console.log('✓ Mise à jour réussie');
+            await grist.setCursorPos({ rowId: taskId });
+            showSuccess(`Carte déplacée ! Validez le nouveau statut "${newStatut}" dans Grist.`);
           } catch (error) {
-            showError('Erreur: ' + error.message);
-            console.error('Erreur détaillée:', error);
-            
-            // Fallback : ouvrir la ligne pour modification manuelle
-            try {
-              await grist.setCursorPos({ rowId: taskId });
-              showError('Veuillez changer manuellement le statut à : ' + newStatut);
-            } catch (e) {
-              console.error('Impossible d\'ouvrir la ligne:', e);
-            }
+            console.error('Erreur setCursorPos:', error);
+            showError('Carte déplacée visuellement, mais veuillez mettre à jour le statut manuellement dans Grist.');
           }
         };
         
@@ -474,7 +430,7 @@
       
       setTimeout(() => {
         successDiv.style.display = 'none';
-      }, 2000);
+      }, 3000);
     }
   </script>
 </body>
