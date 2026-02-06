@@ -103,24 +103,6 @@
       color: #475569;
     }
     
-    .add-task-btn {
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 10px;
-      width: 100%;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      margin-top: 8px;
-      transition: background 0.2s;
-    }
-    
-    .add-task-btn:hover {
-      background: #1d4ed8;
-    }
-    
     .loading {
       text-align: center;
       padding: 40px;
@@ -143,9 +125,25 @@
       color: #166534;
       padding: 12px;
       border-radius: 6px;
-      margin-bottom: 16px;
+      margin: 16px;
       font-size: 13px;
       display: none;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .info-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      text-align: center;
     }
   </style>
 </head>
@@ -153,11 +151,17 @@
   <div id="loading" class="loading">Chargement des données...</div>
   <div id="error" class="error" style="display: none;"></div>
   <div id="success" class="success-message"></div>
-  <div id="kanban" class="kanban-container" style="display: none;"></div>
+  <div id="kanban-wrapper" style="display: none;">
+    <div class="info-banner">
+      💡 <strong>Glissez-déposez</strong> les cartes pour changer leur statut • <strong>Cliquez</strong> sur une carte pour l'éditer dans Grist
+    </div>
+    <div id="kanban" class="kanban-container"></div>
+  </div>
 
   <script>
     let tasksData = [];
     let mappedColumns = {};
+    let tableId = null;
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
@@ -172,6 +176,14 @@
         { name: 'Porteur', optional: true },
         { name: 'Description', optional: true }
       ]
+    });
+    
+    // Obtenir l'ID de la table
+    grist.onOptions(function(options, interaction) {
+      if (interaction.tableId) {
+        tableId = interaction.tableId;
+        console.log('Table ID:', tableId);
+      }
     });
     
     // Charger les données des tâches
@@ -195,7 +207,7 @@
         
         renderKanban();
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('kanban').style.display = 'flex';
+        document.getElementById('kanban-wrapper').style.display = 'block';
       } catch (error) {
         showError('Erreur lors du chargement: ' + error.message);
         console.error('Erreur détaillée:', error);
@@ -224,8 +236,7 @@
           <span>${statut}</span>
           <span class="task-count">${tasks.length}</span>
         </div>
-        <div class="tasks-list" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
-        <button class="add-task-btn" onclick="createNewTask('${statut}')">+ Nouvelle tâche</button>
+        <div class="tasks-list" ondrop="drop(event)" ondragover="allowDrop(event)" data-statut="${statut}"></div>
       `;
       
       const tasksList = column.querySelector('.tasks-list');
@@ -242,7 +253,7 @@
       card.draggable = true;
       card.dataset.taskId = task.id;
       
-      // Afficher les valeurs directement (pas de résolution de références)
+      // Afficher les valeurs directement
       const evenementDisplay = task.evenement || 'N/A';
       const echeance = task.echeance ? formatDate(task.echeance) : 'N/A';
       const porteur = task.porteur || 'N/A';
@@ -266,7 +277,12 @@
       `;
       
       card.addEventListener('dragstart', drag);
-      card.addEventListener('click', () => openTaskInGrist(task.id));
+      card.addEventListener('click', (e) => {
+        // Éviter d'ouvrir pendant le drag
+        if (!card.classList.contains('dragging')) {
+          openTaskInGrist(task.id);
+        }
+      });
       
       return card;
     }
@@ -300,48 +316,60 @@
     async function drop(ev) {
       ev.preventDefault();
       const taskId = parseInt(ev.dataTransfer.getData('taskId'));
-      const column = ev.target.closest('.kanban-column');
-      const newStatut = column.dataset.statut;
+      const tasksList = ev.target.closest('.tasks-list');
+      const newStatut = tasksList.dataset.statut;
       
       const card = document.querySelector(`[data-task-id="${taskId}"]`);
       if (card) card.classList.remove('dragging');
       
-      try {
-        // Utiliser l'API docApi pour mettre à jour
-        await grist.docApi.applyUserActions([
-          ['UpdateRecord', '4. Tâches', taskId, { Statut: newStatut }]
-        ]);
-        
-        // Mettre à jour les données locales
-        const task = tasksData.find(t => t.id === taskId);
-        if (task) task.statut = newStatut;
-        
-        showSuccess('Statut mis à jour avec succès !');
-        renderKanban();
-      } catch (error) {
-        showError('Erreur lors du changement de statut: ' + error.message);
-        console.error('Erreur détaillée:', error);
+      const task = tasksData.find(t => t.id === taskId);
+      if (!task) {
+        showError('Tâche introuvable');
+        return;
       }
-    }
-    
-    // Créer une nouvelle tâche directement dans Grist
-    async function createNewTask(statut) {
+      
+      // Ne rien faire si le statut n'a pas changé
+      if (task.statut === newStatut) {
+        return;
+      }
+      
       try {
-        // Créer une ligne vide avec le statut approprié
-        await grist.docApi.applyUserActions([
-          ['AddRecord', '4. Tâches', null, {
-            Tâche: 'Nouvelle tâche',
-            Statut: statut
-          }]
-        ]);
+        // Méthode 1 : Essayer avec docApi
+        try {
+          await grist.docApi.applyUserActions([
+            ['UpdateRecord', tableId, taskId, { 
+              [mappedColumns.Statut]: newStatut 
+            }]
+          ]);
+          
+          task.statut = newStatut;
+          showSuccess(`Statut changé : ${newStatut} ✓`);
+          renderKanban();
+          return;
+        } catch (e) {
+          console.log('Méthode 1 échouée, essai méthode 2:', e);
+        }
         
-        showSuccess('Nouvelle tâche créée ! Complétez les détails dans Grist.');
+        // Méthode 2 : Utiliser setters si disponibles
+        try {
+          await grist.selectedTable.update(taskId, {
+            [mappedColumns.Statut]: newStatut
+          });
+          
+          task.statut = newStatut;
+          showSuccess(`Statut changé : ${newStatut} ✓`);
+          renderKanban();
+          return;
+        } catch (e) {
+          console.log('Méthode 2 échouée, essai méthode 3:', e);
+        }
         
-        // Note: La nouvelle ligne s'ouvrira automatiquement dans Grist
-        // grâce au comportement par défaut de AddRecord
+        // Méthode 3 : Sélectionner et demander à l'utilisateur
+        await grist.setCursorPos({ rowId: taskId });
+        showError('Veuillez changer le statut manuellement dans Grist à : ' + newStatut);
         
       } catch (error) {
-        showError('Erreur lors de la création: ' + error.message);
+        showError('Erreur: ' + error.message);
         console.error('Erreur détaillée:', error);
       }
     }
@@ -367,7 +395,7 @@
       
       setTimeout(() => {
         successDiv.style.display = 'none';
-      }, 3000);
+      }, 2000);
     }
   </script>
 </body>
