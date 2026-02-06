@@ -175,12 +175,13 @@
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
-    // Initialisation
+    // Initialisation - AJOUT DE PARTENAIRE
     grist.ready({
       requiredAccess: 'full',
       columns: [
         { name: 'Tâche', optional: false },
         { name: 'Evènement', optional: false },
+        { name: 'Partenaire', optional: true },
         { name: 'Statut', optional: false },
         { name: 'Echéance', optional: true },
         { name: 'Porteur', optional: true },
@@ -209,31 +210,27 @@
         tasksData = records.map(record => {
           const mapped = grist.mapColumnNames(record, mappings);
           
-          // DEBUG : voir ce que Grist retourne
           console.log('---');
           console.log('Record ID:', record.id);
           console.log('Tâche:', mapped.Tâche);
+          console.log('Partenaire:', mapped.Partenaire);
           console.log('Statut brut:', mapped.Statut);
-          console.log('Type de Statut:', typeof mapped.Statut);
           
           // Normaliser le statut
           let statutFinal = mapped.Statut || 'À faire';
           
-          // Si c'est un tableau (cas de certains widgets)
           if (Array.isArray(statutFinal)) {
             statutFinal = statutFinal[0] || 'À faire';
           }
           
-          // Nettoyer les espaces
           if (typeof statutFinal === 'string') {
             statutFinal = statutFinal.trim();
           }
           
-          console.log('Statut final utilisé:', statutFinal);
-          
           return {
             id: record.id,
             tache: mapped.Tâche || '',
+            partenaire: mapped.Partenaire || null,
             evenement: mapped.Evènement || null,
             statut: statutFinal,
             echeance: mapped.Echéance || null,
@@ -248,14 +245,6 @@
           const count = tasksData.filter(t => t.statut === statut).length;
           console.log(`  ${statut}: ${count} tâches`);
         });
-        
-        const autresStatuts = tasksData.filter(t => !STATUTS.includes(t.statut));
-        if (autresStatuts.length > 0) {
-          console.log('⚠️ Tâches avec statuts non reconnus:');
-          autresStatuts.forEach(t => {
-            console.log(`  - ID ${t.id}: "${t.statut}"`);
-          });
-        }
         
         renderKanban();
         document.getElementById('loading').style.display = 'none';
@@ -309,6 +298,7 @@
       card.dataset.taskId = task.id;
       
       // Afficher les valeurs
+      const partenaireDisplay = task.partenaire || 'Non défini';
       const evenementDisplay = task.evenement || 'Non défini';
       const echeance = task.echeance ? formatDate(task.echeance) : 'Non définie';
       const porteur = task.porteur || 'Non assigné';
@@ -316,7 +306,7 @@
       card.innerHTML = `
         <div class="task-partenaire">
           <span>🤝</span>
-          <span>Partenaire</span>
+          <span>${partenaireDisplay}</span>
         </div>
         <div class="task-title">${task.tache}</div>
         <div class="task-meta">
@@ -399,47 +389,18 @@
           console.log('Task ID:', taskId);
           console.log('Ancien statut:', task.statut);
           console.log('Nouveau statut:', newStatut);
-          console.log('Table ID:', tableId);
-          console.log('Mapping Statut:', mappedColumns.Statut);
           
           try {
-            // Méthode 1 : Essayer avec docApi
-            try {
-              await grist.docApi.applyUserActions([
-                ['UpdateRecord', tableId, taskId, { 
-                  [mappedColumns.Statut]: newStatut 
-                }]
-              ]);
-              
-              task.statut = newStatut;
-              showSuccess(`Statut changé : ${newStatut} ✓`);
-              renderKanban();
-              console.log('✓ Méthode 1 réussie');
-              return;
-            } catch (e) {
-              console.log('✗ Méthode 1 échouée:', e.message);
-            }
+            await grist.docApi.applyUserActions([
+              ['UpdateRecord', tableId, taskId, { 
+                [mappedColumns.Statut]: newStatut 
+              }]
+            ]);
             
-            // Méthode 2 : Utiliser setters si disponibles
-            try {
-              await grist.selectedTable.update(taskId, {
-                [mappedColumns.Statut]: newStatut
-              });
-              
-              task.statut = newStatut;
-              showSuccess(`Statut changé : ${newStatut} ✓`);
-              renderKanban();
-              console.log('✓ Méthode 2 réussie');
-              return;
-            } catch (e) {
-              console.log('✗ Méthode 2 échouée:', e.message);
-            }
-            
-            // Méthode 3 : Sélectionner et demander à l'utilisateur
-            await grist.setCursorPos({ rowId: taskId });
-            showError('Veuillez changer le statut manuellement dans Grist à : ' + newStatut);
-            console.log('✗ Toutes les méthodes ont échoué, action manuelle requise');
-            
+            task.statut = newStatut;
+            showSuccess(`Statut changé : ${newStatut} ✓`);
+            renderKanban();
+            console.log('✓ Mise à jour réussie');
           } catch (error) {
             showError('Erreur: ' + error.message);
             console.error('Erreur détaillée:', error);
@@ -454,7 +415,6 @@
     function formatDate(dateValue) {
       if (!dateValue) return 'Non définie';
       
-      // Grist peut retourner soit un timestamp, soit une date ISO
       let date;
       if (typeof dateValue === 'number') {
         date = new Date(dateValue * 1000);
