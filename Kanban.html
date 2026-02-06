@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban CRM</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f5f7fa;
+      padding: 16px;
+      overflow-x: auto;
+    }
+    
+    .kanban-container {
+      display: flex;
+      gap: 16px;
+      min-width: fit-content;
+    }
+    
+    .kanban-column {
+      background: #fff;
+      border-radius: 8px;
+      width: 300px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .column-header {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1e3a5f;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #2563eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .task-count {
+      background: #2563eb;
+      color: white;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+    }
+    
+    .tasks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 100px;
+    }
+    
+    .task-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px;
+      cursor: move;
+      transition: all 0.2s;
+    }
+    
+    .task-card:hover {
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+      border-color: #2563eb;
+    }
+    
+    .task-card.dragging {
+      opacity: 0.5;
+    }
+    
+    .task-title {
+      font-weight: 600;
+      color: #1e3a5f;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    
+    .task-meta {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    
+    .task-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 3px;
+    }
+    
+    .task-meta-label {
+      font-weight: 500;
+      color: #475569;
+    }
+    
+    .add-task-btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px;
+      width: 100%;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+    
+    .add-task-btn:hover {
+      background: #1d4ed8;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin-bottom: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    
+    .form-label.required::after {
+      content: " *";
+      color: #dc2626;
+    }
+    
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      flex: 1;
+    }
+    
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+    
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+      flex: 1;
+    }
+    
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+    
+    .error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">Chargement des données...</div>
+  <div id="error" class="error" style="display: none;"></div>
+  <div id="kanban" class="kanban-container" style="display: none;"></div>
+  
+  <!-- Modal pour nouvelle tâche -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Nouvelle tâche</div>
+      <div id="modal-error" class="error" style="display: none;"></div>
+      <form id="task-form">
+        <div class="form-group">
+          <label class="form-label required">Partenaire</label>
+          <select id="partenaire-select" class="form-select" required>
+            <option value="">Sélectionnez un partenaire</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">Événement</label>
+          <select id="evenement-select" class="form-select" required disabled>
+            <option value="">Sélectionnez d'abord un partenaire</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">Nom de la tâche</label>
+          <input type="text" id="tache-input" class="form-input" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">Échéance</label>
+          <input type="date" id="echeance-input" class="form-input" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label required">Porteur</label>
+          <input type="text" id="porteur-input" class="form-input" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Description (optionnel)</label>
+          <textarea id="description-input" class="form-textarea"></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer la tâche</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let tasksData = [];
+    let evenementsData = [];
+    let partenairesData = [];
+    let tableId = null;
+    
+    const STATUTS = ['À faire', 'En cours', 'Terminé'];
+    
+    // Initialisation
+    grist.ready({
+      requiredAccess: 'full',
+      columns: [
+        { name: 'Tâche', optional: false },
+        { name: 'Evènement', optional: false },
+        { name: 'Statut', optional: false },
+        { name: 'Echéance', optional: true },
+        { name: 'Porteur', optional: true },
+        { name: 'Description', optional: true }
+      ]
+    });
+    
+    // Charger toutes les données
+    grist.onRecords(async function(records, mappings) {
+      try {
+        tableId = await grist.getTableId();
+        
+        // Charger les tâches
+        tasksData = records.map(record => ({
+          id: record.id,
+          tache: grist.getRecord(record, mappings, 'Tâche'),
+          evenement: grist.getRecord(record, mappings, 'Evènement'),
+          statut: grist.getRecord(record, mappings, 'Statut') || 'À faire',
+          echeance: grist.getRecord(record, mappings, 'Echéance'),
+          porteur: grist.getRecord(record, mappings, 'Porteur'),
+          description: grist.getRecord(record, mappings, 'Description')
+        }));
+        
+        // Charger événements et partenaires
+        await loadRelatedData();
+        
+        renderKanban();
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('kanban').style.display = 'flex';
+      } catch (error) {
+        showError('Erreur lors du chargement des données: ' + error.message);
+      }
+    });
+    
+    async function loadRelatedData() {
+      try {
+        // Charger les événements
+        const evenementsTable = await grist.getTable('3. Evènements');
+        evenementsData = await grist.fetchTable('3. Evènements') || [];
+        
+        // Charger les partenaires
+        const partenairesTable = await grist.getTable('1. BDD partenaires');
+        partenairesData = await grist.fetchTable('1. BDD partenaires') || [];
+      } catch (error) {
+        console.error('Erreur chargement données liées:', error);
+      }
+    }
+    
+    function renderKanban() {
+      const container = document.getElementById('kanban');
+      container.innerHTML = '';
+      
+      STATUTS.forEach(statut => {
+        const column = createColumn(statut);
+        container.appendChild(column);
+      });
+    }
+    
+    function createColumn(statut) {
+      const column = document.createElement('div');
+      column.className = 'kanban-column';
+      column.dataset.statut = statut;
+      
+      const tasks = tasksData.filter(t => t.statut === statut);
+      
+      column.innerHTML = `
+        <div class="column-header">
+          <span>${statut}</span>
+          <span class="task-count">${tasks.length}</span>
+        </div>
+        <div class="tasks-list" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        <button class="add-task-btn" onclick="openModal('${statut}')">+ Nouvelle tâche</button>
+      `;
+      
+      const tasksList = column.querySelector('.tasks-list');
+      tasks.forEach(task => {
+        tasksList.appendChild(createTaskCard(task));
+      });
+      
+      return column;
+    }
+    
+    function createTaskCard(task) {
+      const card = document.createElement('div');
+      card.className = 'task-card';
+      card.draggable = true;
+      card.dataset.taskId = task.id;
+      
+      // Récupérer les infos liées
+      const evenement = getEvenementById(task.evenement);
+      const partenaire = evenement ? getPartenaireById(evenement.Partenaire) : null;
+      
+      const evenementName = evenement ? evenement.Evènement : 'N/A';
+      const partenaireName = partenaire ? partenaire.Partenaire : 'N/A';
+      const echeance = task.echeance ? formatDate(task.echeance) : 'N/A';
+      const porteur = task.porteur || 'N/A';
+      
+      card.innerHTML = `
+        <div class="task-title">${task.tache}</div>
+        <div class="task-meta">
+          <div class="task-meta-row">
+            <span class="task-meta-label">📅</span>
+            <span>${echeance}</span>
+          </div>
+          <div class="task-meta-row">
+            <span class="task-meta-label">👤</span>
+            <span>${porteur}</span>
+          </div>
+          <div class="task-meta-row">
+            <span class="task-meta-label">🎯</span>
+            <span>${evenementName}</span>
+          </div>
+          <div class="task-meta-row">
+            <span class="task-meta-label">🤝</span>
+            <span>${partenaireName}</span>
+          </div>
+        </div>
+      `;
+      
+      card.addEventListener('dragstart', drag);
+      card.addEventListener('click', () => openTaskInGrist(task.id));
+      
+      return card;
+    }
+    
+    function getEvenementById(id) {
+      return evenementsData.find(e => e.id === id);
+    }
+    
+    function getPartenaireById(id) {
+      return partenairesData.find(p => p.id === id);
+    }
+    
+    function formatDate(dateValue) {
+      if (!dateValue) return 'N/A';
+      const date = new Date(dateValue * 1000); // Grist utilise timestamps Unix
+      return date.toLocaleDateString('fr-FR');
+    }
+    
+    // Drag and drop
+    function allowDrop(ev) {
+      ev.preventDefault();
+    }
+    
+    function drag(ev) {
+      ev.dataTransfer.setData('taskId', ev.target.dataset.taskId);
+      ev.target.classList.add('dragging');
+    }
+    
+    async function drop(ev) {
+      ev.preventDefault();
+      const taskId = parseInt(ev.dataTransfer.getData('taskId'));
+      const column = ev.target.closest('.kanban-column');
+      const newStatut = column.dataset.statut;
+      
+      const card = document.querySelector(`[data-task-id="${taskId}"]`);
+      if (card) card.classList.remove('dragging');
+      
+      try {
+        await grist.getTable(tableId).update({
+          id: taskId,
+          Statut: newStatut
+        });
+        
+        // Mettre à jour les données locales
+        const task = tasksData.find(t => t.id === taskId);
+        if (task) task.statut = newStatut;
+        
+        renderKanban();
+      } catch (error) {
+        showError('Erreur lors du changement de statut: ' + error.message);
+      }
+    }
+    
+    // Modal
+    let currentStatut = 'À faire';
+    
+    function openModal(statut = 'À faire') {
+      currentStatut = statut;
+      document.getElementById('modal').classList.add('active');
+      populatePartenairesSelect();
+      document.getElementById('task-form').reset();
+      document.getElementById('evenement-select').disabled = true;
+      document.getElementById('modal-error').style.display = 'none';
+    }
+    
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+    
+    function populatePartenairesSelect() {
+      const select = document.getElementById('partenaire-select');
+      select.innerHTML = '<option value="">Sélectionnez un partenaire</option>';
+      
+      partenairesData.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.Partenaire;
+        select.appendChild(option);
+      });
+    }
+    
+    // Filtrer les événements par partenaire
+    document.getElementById('partenaire-select').addEventListener('change', function() {
+      const partenaireId = parseInt(this.value);
+      const evenementSelect = document.getElementById('evenement-select');
+      
+      evenementSelect.innerHTML = '<option value="">Sélectionnez un événement</option>';
+      
+      if (partenaireId) {
+        const filteredEvenements = evenementsData.filter(e => e.Partenaire === partenaireId);
+        
+        filteredEvenements.forEach(e => {
+          const option = document.createElement('option');
+          option.value = e.id;
+          option.textContent = e.Evènement;
+          evenementSelect.appendChild(option);
+        });
+        
+        evenementSelect.disabled = false;
+      } else {
+        evenementSelect.disabled = true;
+      }
+    });
+    
+    // Soumettre le formulaire
+    document.getElementById('task-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const tache = document.getElementById('tache-input').value;
+      const evenementId = parseInt(document.getElementById('evenement-select').value);
+      const echeance = document.getElementById('echeance-input').value;
+      const porteur = document.getElementById('porteur-input').value;
+      const description = document.getElementById('description-input').value;
+      
+      try {
+        // Convertir la date en timestamp Unix (Grist utilise ce format)
+        const dateObj = new Date(echeance);
+        const timestamp = Math.floor(dateObj.getTime() / 1000);
+        
+        await grist.getTable(tableId).create({
+          Tâche: tache,
+          Evènement: evenementId,
+          Statut: currentStatut,
+          Echéance: timestamp,
+          Porteur: porteur,
+          Description: description
+        });
+        
+        closeModal();
+      } catch (error) {
+        document.getElementById('modal-error').textContent = 'Erreur lors de la création: ' + error.message;
+        document.getElementById('modal-error').style.display = 'block';
+      }
+    });
+    
+    function openTaskInGrist(taskId) {
+      grist.setCursorPos({ rowId: taskId });
+    }
+    
+    function showError(message) {
+      const errorDiv = document.getElementById('error');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+    // Fermer le modal en cliquant à l'extérieur
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+  </script>
+</body>
+</html>
