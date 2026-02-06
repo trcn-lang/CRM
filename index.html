@@ -31,6 +31,12 @@
       width: 320px;
       padding: 12px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      transition: background 0.2s;
+    }
+    
+    .kanban-column.drag-over {
+      background: #eff6ff;
+      border: 2px dashed #2563eb;
     }
     
     .column-header {
@@ -67,14 +73,20 @@
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       padding: 12px;
-      cursor: pointer;
+      cursor: move;
       transition: all 0.2s;
+      user-select: none;
     }
     
     .task-card:hover {
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
       border-color: #2563eb;
       transform: translateY(-2px);
+    }
+    
+    .task-card.dragging {
+      opacity: 0.4;
+      cursor: grabbing;
     }
     
     .task-partenaire {
@@ -317,7 +329,7 @@
   
   <div id="kanban-wrapper" style="display: none;">
     <div class="info-banner">
-      💡 <strong>Cliquez sur une carte</strong> pour modifier • <strong>Bouton +</strong> pour créer une nouvelle tâche
+      💡 <strong>Glissez-déposez</strong> les cartes pour changer le statut • <strong>Double-clic</strong> pour modifier • <strong>Bouton +</strong> pour créer
     </div>
     <div id="kanban" class="kanban-container"></div>
   </div>
@@ -389,6 +401,7 @@
     let currentTaskId = null;
     let isNewTask = false;
     let newTaskStatut = null;
+    let draggedTaskId = null;
     
     grist.ready({ requiredAccess: 'full' });
     
@@ -482,6 +495,7 @@
       statutsChoices.forEach(statut => {
         const column = document.createElement('div');
         column.className = 'kanban-column';
+        column.dataset.statut = statut;
         
         const tasks = tasksData.filter(t => t.Statut === statut);
         
@@ -496,30 +510,111 @@
         
         const tasksList = column.querySelector('.tasks-list');
         tasks.forEach(task => {
-          const card = document.createElement('div');
-          card.className = 'task-card';
-          card.onclick = () => openModal(task);
-          
-          const partenaireNom = getPartenaireName(task.Partenaire);
-          const evenementNom = getEvenementName(task.Evenement);
-          const echeance = task.Echeance ? formatDate(task.Echeance) : 'Non définie';
-          const porteur = task.Porteur || 'Non assigné';
-          
-          card.innerHTML = `
-            <div class="task-partenaire">🤝 ${partenaireNom}</div>
-            <div class="task-title">${task.Tache}</div>
-            <div class="task-meta">
-              <div class="task-meta-row">🎯 ${evenementNom}</div>
-              <div class="task-meta-row">📅 ${echeance}</div>
-              <div class="task-meta-row">👤 ${porteur}</div>
-            </div>
-          `;
-          
+          const card = createTaskCard(task);
           tasksList.appendChild(card);
         });
         
+        // Ajouter les événements drag & drop sur la colonne
+        setupDropZone(column, statut);
+        
         container.appendChild(column);
       });
+    }
+    
+    function createTaskCard(task) {
+      const card = document.createElement('div');
+      card.className = 'task-card';
+      card.draggable = true;
+      card.dataset.taskId = task.id;
+      
+      const partenaireNom = getPartenaireName(task.Partenaire);
+      const evenementNom = getEvenementName(task.Evenement);
+      const echeance = task.Echeance ? formatDate(task.Echeance) : 'Non définie';
+      const porteur = task.Porteur || 'Non assigné';
+      
+      card.innerHTML = `
+        <div class="task-partenaire">🤝 ${partenaireNom}</div>
+        <div class="task-title">${task.Tache}</div>
+        <div class="task-meta">
+          <div class="task-meta-row">🎯 ${evenementNom}</div>
+          <div class="task-meta-row">📅 ${echeance}</div>
+          <div class="task-meta-row">👤 ${porteur}</div>
+        </div>
+      `;
+      
+      // Double-clic pour ouvrir le modal
+      card.addEventListener('dblclick', () => openModal(task));
+      
+      // Drag start
+      card.addEventListener('dragstart', (e) => {
+        draggedTaskId = task.id;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      
+      // Drag end
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        draggedTaskId = null;
+      });
+      
+      return card;
+    }
+    
+    function setupDropZone(column, statut) {
+      // Dragover sur la colonne
+      column.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        column.classList.add('drag-over');
+      });
+      
+      // Dragleave
+      column.addEventListener('dragleave', (e) => {
+        if (e.target === column) {
+          column.classList.remove('drag-over');
+        }
+      });
+      
+      // Drop
+      column.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        
+        if (!draggedTaskId) return;
+        
+        const task = tasksData.find(t => t.id === draggedTaskId);
+        if (!task) return;
+        
+        // Ne rien faire si même statut
+        if (task.Statut === statut) return;
+        
+        // Mettre à jour le statut
+        await updateTaskStatus(draggedTaskId, statut);
+      });
+    }
+    
+    async function updateTaskStatus(taskId, newStatut) {
+      try {
+        await grist.docApi.applyUserActions([
+          ['BulkUpdateRecord', 'Taches', [taskId], {
+            Statut: [newStatut]
+          }]
+        ]);
+        
+        // Mettre à jour localement
+        const task = tasksData.find(t => t.id === taskId);
+        if (task) {
+          task.Statut = newStatut;
+        }
+        
+        showSuccess(`✅ Statut changé : ${newStatut}`);
+        renderKanban();
+        
+      } catch (error) {
+        console.error('Erreur drag & drop:', error);
+        showSuccess('❌ Erreur: ' + error.message);
+      }
     }
     
     function getPartenaireName(id) {
@@ -665,7 +760,7 @@
       newTaskStatut = null;
     }
     
-    // Sauvegarde - CORRIGÉ
+    // Sauvegarde
     document.getElementById('task-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -686,7 +781,7 @@
       
       try {
         if (isNewTask) {
-          // Créer nouvelle tâche - AddRecord n'utilise PAS de tableaux
+          // Créer nouvelle tâche
           await grist.docApi.applyUserActions([
             ['AddRecord', 'Taches', null, {
               Tache: tache,
@@ -700,7 +795,7 @@
           ]);
           showSuccess('✅ Tâche créée !');
         } else {
-          // Mettre à jour tâche existante - BulkUpdateRecord utilise des tableaux
+          // Mettre à jour tâche existante
           await grist.docApi.applyUserActions([
             ['BulkUpdateRecord', 'Taches', [currentTaskId], {
               Tache: [tache],
