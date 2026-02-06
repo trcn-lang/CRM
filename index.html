@@ -218,6 +218,12 @@
       box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
     }
     
+    .form-select:disabled {
+      background: #f1f5f9;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    
     .form-textarea {
       resize: vertical;
       min-height: 90px;
@@ -296,6 +302,13 @@
       font-size: 13px;
       display: none;
     }
+    
+    .helper-text {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -329,9 +342,10 @@
         
         <div class="form-group">
           <label class="form-label required">🎯 Événement</label>
-          <select id="input-evenement" class="form-select" required>
-            <option value="">Sélectionnez un événement</option>
+          <select id="input-evenement" class="form-select" required disabled>
+            <option value="">Sélectionnez d'abord un partenaire</option>
           </select>
+          <div class="helper-text" id="evenement-helper">Choisissez un partenaire pour voir les événements</div>
         </div>
         
         <div class="form-group">
@@ -401,11 +415,12 @@
           Partenaire: partenairesResult.Partenaire?.[i] || ''
         }));
         
-        // Charger les événements
+        // Charger les événements AVEC leur partenaire
         const evenementsResult = await grist.docApi.fetchTable('Evenements');
         evenementsData = evenementsResult.id.map((id, i) => ({
           id: id,
-          Evenement: evenementsResult.Evenement?.[i] || ''
+          Evenement: evenementsResult.Evenement?.[i] || '',
+          Partenaire: evenementsResult.Partenaire?.[i] || null  // ← IMPORTANT !
         }));
         
         // Récupérer les choix pour Statut et Porteur depuis les métadonnées
@@ -527,6 +542,13 @@
       populateSelects();
       document.getElementById('input-statut').value = statut;
       document.getElementById('modal-error').style.display = 'none';
+      
+      // Réinitialiser événements
+      const evenementSelect = document.getElementById('input-evenement');
+      evenementSelect.disabled = true;
+      evenementSelect.innerHTML = '<option value="">Sélectionnez d\'abord un partenaire</option>';
+      document.getElementById('evenement-helper').style.display = 'block';
+      
       document.getElementById('modal').classList.add('active');
     }
     
@@ -539,7 +561,11 @@
       
       document.getElementById('input-tache').value = task.Tache || '';
       document.getElementById('input-partenaire').value = task.Partenaire || '';
+      
+      // Mettre à jour événements en fonction du partenaire
+      updateEvenementsForPartenaire(task.Partenaire);
       document.getElementById('input-evenement').value = task.Evenement || '';
+      
       document.getElementById('input-statut').value = task.Statut || '';
       document.getElementById('input-echeance').value = task.Echeance ? formatDateInput(task.Echeance) : '';
       document.getElementById('input-porteur').value = task.Porteur || '';
@@ -560,15 +586,10 @@
         partenaireSelect.appendChild(option);
       });
       
-      // Événements
+      // Événements (sera mis à jour dynamiquement)
       const evenementSelect = document.getElementById('input-evenement');
-      evenementSelect.innerHTML = '<option value="">Sélectionnez un événement</option>';
-      evenementsData.forEach(e => {
-        const option = document.createElement('option');
-        option.value = e.id;
-        option.textContent = e.Evenement;
-        evenementSelect.appendChild(option);
-      });
+      evenementSelect.innerHTML = '<option value="">Sélectionnez d\'abord un partenaire</option>';
+      evenementSelect.disabled = true;
       
       // Statuts
       const statutSelect = document.getElementById('input-statut');
@@ -590,6 +611,52 @@
         porteurSelect.appendChild(option);
       });
     }
+    
+    // ✨ NOUVELLE FONCTION : Filtrer les événements par partenaire
+    function updateEvenementsForPartenaire(partenaireId) {
+      const evenementSelect = document.getElementById('input-evenement');
+      const helper = document.getElementById('evenement-helper');
+      
+      if (!partenaireId) {
+        evenementSelect.innerHTML = '<option value="">Sélectionnez d\'abord un partenaire</option>';
+        evenementSelect.disabled = true;
+        helper.style.display = 'block';
+        return;
+      }
+      
+      // Filtrer les événements pour ce partenaire
+      const filteredEvenements = evenementsData.filter(e => e.Partenaire == partenaireId);
+      
+      evenementSelect.innerHTML = '<option value="">Sélectionnez un événement</option>';
+      
+      if (filteredEvenements.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Aucun événement pour ce partenaire';
+        evenementSelect.appendChild(option);
+        helper.textContent = 'Aucun événement disponible pour ce partenaire';
+        helper.style.display = 'block';
+      } else {
+        filteredEvenements.forEach(e => {
+          const option = document.createElement('option');
+          option.value = e.id;
+          option.textContent = e.Evenement;
+          evenementSelect.appendChild(option);
+        });
+        helper.style.display = 'none';
+      }
+      
+      evenementSelect.disabled = false;
+    }
+    
+    // ✨ Écouter les changements de partenaire
+    document.getElementById('input-partenaire').addEventListener('change', function() {
+      const partenaireId = this.value;
+      updateEvenementsForPartenaire(partenaireId);
+      
+      // Réinitialiser la sélection d'événement
+      document.getElementById('input-evenement').value = '';
+    });
     
     function closeModal() {
       document.getElementById('modal').classList.remove('active');
