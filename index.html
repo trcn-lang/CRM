@@ -2,568 +2,179 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kanban CRM</title>
+  <title>Test Modification Grist</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      background: #f5f7fa;
-      padding: 16px;
-      overflow-x: auto;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
     }
-    
-    .kanban-container {
-      display: flex;
-      gap: 16px;
-      min-width: fit-content;
-    }
-    
-    .kanban-column {
-      background: #fff;
+    .task {
+      background: white;
+      padding: 15px;
+      margin: 10px 0;
       border-radius: 8px;
-      width: 300px;
-      padding: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border: 2px solid #ddd;
     }
-    
-    .column-header {
-      font-weight: 600;
-      font-size: 14px;
-      color: #1e3a5f;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #2563eb;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .task-count {
-      background: #2563eb;
-      color: white;
-      border-radius: 12px;
-      padding: 2px 8px;
-      font-size: 12px;
-    }
-    
-    .tasks-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 100px;
-    }
-    
-    .task-card {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    
-    .task-card:hover {
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
-      border-color: #2563eb;
-      transform: translateY(-2px);
-    }
-    
-    .task-partenaire {
-      font-size: 11px;
-      color: #64748b;
-      font-weight: 500;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    
-    .task-title {
-      font-weight: 600;
-      color: #1e3a5f;
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-    
-    .task-meta {
-      font-size: 11px;
-      color: #64748b;
-      line-height: 1.5;
-    }
-    
-    .task-meta-row {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 4px;
-    }
-    
-    .task-meta-label {
-      font-weight: 500;
-      color: #475569;
-    }
-    
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: #64748b;
-    }
-    
-    .error {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #991b1b;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 13px;
-    }
-    
-    .success-message {
-      background: #f0fdf4;
-      border: 1px solid #86efac;
-      color: #166534;
-      padding: 12px;
-      border-radius: 6px;
-      margin: 16px;
-      font-size: 13px;
-      display: none;
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .info-banner {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 13px;
-      text-align: center;
-    }
-    
-    /* Modal */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .modal.active {
-      display: flex;
-    }
-    
-    .modal-content {
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      width: 90%;
-      max-width: 500px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-    }
-    
-    .modal-header {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1e3a5f;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #e2e8f0;
-    }
-    
-    .modal-field {
-      margin-bottom: 16px;
-    }
-    
-    .modal-label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 6px;
-    }
-    
-    .modal-value {
-      padding: 10px 12px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      font-size: 14px;
-      color: #1e3a5f;
-    }
-    
-    .modal-select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 2px solid #2563eb;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      background: white;
-      color: #1e3a5f;
-      cursor: pointer;
-    }
-    
-    .modal-select:focus {
-      outline: none;
-      border-color: #1d4ed8;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
-    
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 24px;
-      padding-top: 16px;
-      border-top: 1px solid #e2e8f0;
-    }
-    
-    .btn {
+    button {
       padding: 10px 20px;
+      margin: 5px;
       border: none;
       border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s;
-      flex: 1;
+      font-weight: bold;
     }
-    
-    .btn-primary {
-      background: #2563eb;
-      color: white;
+    .btn-todo { background: #fef3c7; }
+    .btn-progress { background: #dbeafe; }
+    .btn-done { background: #d1fae5; }
+    .info {
+      background: #eff6ff;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 8px;
+      border: 1px solid #bfdbfe;
     }
-    
-    .btn-primary:hover {
-      background: #1d4ed8;
+    .error {
+      background: #fee;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #fcc;
+      color: #c00;
     }
-    
-    .btn-secondary {
-      background: #e2e8f0;
-      color: #475569;
-    }
-    
-    .btn-secondary:hover {
-      background: #cbd5e1;
-    }
-    
-    .btn-edit {
-      background: #f59e0b;
-      color: white;
-    }
-    
-    .btn-edit:hover {
-      background: #d97706;
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <div id="loading" class="loading">Chargement des données...</div>
-  <div id="error" class="error" style="display: none;"></div>
-  <div id="success" class="success-message"></div>
-  <div id="kanban-wrapper" style="display: none;">
-    <div class="info-banner">
-      💡 <strong>Cliquez sur une carte</strong> pour voir les détails et changer le statut
-    </div>
-    <div id="kanban" class="kanban-container"></div>
+  <h1>🧪 Test de modification Grist</h1>
+  
+  <div class="info">
+    <strong>Instructions :</strong><br>
+    1. Sélectionnez une tâche dans le tableau ci-dessous<br>
+    2. Cliquez sur un bouton de statut<br>
+    3. Regardez les logs pour voir ce qui se passe
   </div>
   
-  <!-- Modal pour voir/modifier une tâche -->
-  <div id="modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">Détails de la tâche</div>
-      
-      <div class="modal-field">
-        <div class="modal-label">🤝 Partenaire</div>
-        <div class="modal-value" id="modal-partenaire">-</div>
-      </div>
-      
-      <div class="modal-field">
-        <div class="modal-label">📋 Tâche</div>
-        <div class="modal-value" id="modal-tache">-</div>
-      </div>
-      
-      <div class="modal-field">
-        <div class="modal-label">🎯 Événement</div>
-        <div class="modal-value" id="modal-evenement">-</div>
-      </div>
-      
-      <div class="modal-field">
-        <div class="modal-label">📅 Échéance</div>
-        <div class="modal-value" id="modal-echeance">-</div>
-      </div>
-      
-      <div class="modal-field">
-        <div class="modal-label">👤 Porteur</div>
-        <div class="modal-value" id="modal-porteur">-</div>
-      </div>
-      
-      <div class="modal-field">
-        <div class="modal-label">📝 Statut</div>
-        <select id="modal-statut" class="modal-select">
-          <option value="À faire">À faire</option>
-          <option value="En cours">En cours</option>
-          <option value="Terminé">Terminé</option>
-        </select>
-      </div>
-      
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
-        <button class="btn btn-edit" onclick="openInGrist()">Éditer dans Grist</button>
-        <button class="btn btn-primary" onclick="saveStatut()">Sauvegarder</button>
-      </div>
+  <div id="current-task" class="task" style="display:none;">
+    <h3 id="task-title">-</h3>
+    <p><strong>Statut actuel :</strong> <span id="task-status">-</span></p>
+    <div>
+      <button class="btn-todo" onclick="changeStatus('À faire')">À faire</button>
+      <button class="btn-progress" onclick="changeStatus('En cours')">En cours</button>
+      <button class="btn-done" onclick="changeStatus('Terminé')">Terminé</button>
     </div>
+  </div>
+  
+  <div id="logs">
+    <h3>📋 Logs de débogage</h3>
   </div>
 
   <script>
-    let tasksData = [];
-    let mappedColumns = {};
-    let currentTaskId = null;
+    let currentRecord = null;
+    let mappings = null;
+    let allRecords = [];
     
-    const STATUTS = ['À faire', 'En cours', 'Terminé'];
+    function log(message, data = null) {
+      const logsDiv = document.getElementById('logs');
+      const time = new Date().toLocaleTimeString();
+      const logEntry = document.createElement('pre');
+      logEntry.textContent = `[${time}] ${message}`;
+      if (data) {
+        logEntry.textContent += '\n' + JSON.stringify(data, null, 2);
+      }
+      logsDiv.appendChild(logEntry);
+      console.log(message, data);
+    }
     
     // Initialisation
     grist.ready({
       requiredAccess: 'full',
       columns: [
         { name: 'Tâche', optional: false },
-        { name: 'Evènement', optional: false },
-        { name: 'Partenaire', optional: true },
-        { name: 'Statut', optional: false },
-        { name: 'Echéance', optional: true },
-        { name: 'Porteur', optional: true },
-        { name: 'Description', optional: true }
+        { name: 'Statut', optional: false }
       ]
     });
     
-    // Charger les données des tâches
-    grist.onRecords(function(records, mappings) {
+    log('✅ Widget initialisé');
+    
+    // Écouter les changements de sélection
+    grist.onRecord(function(record, mappedRecord) {
+      log('📍 Ligne sélectionnée', { record, mappedRecord });
+      currentRecord = record;
+      
+      const tache = mappedRecord.Tâche || 'Sans nom';
+      const statut = mappedRecord.Statut || 'Non défini';
+      
+      document.getElementById('task-title').textContent = tache;
+      document.getElementById('task-status').textContent = statut;
+      document.getElementById('current-task').style.display = 'block';
+    });
+    
+    // Charger toutes les données
+    grist.onRecords(function(records, recordMappings) {
+      log('📊 Données chargées', { 
+        count: records.length,
+        mappings: recordMappings 
+      });
+      allRecords = records;
+      mappings = recordMappings;
+    });
+    
+    // FONCTION CRITIQUE : Changer le statut
+    async function changeStatus(newStatus) {
+      log(`🎯 Tentative de changement vers: ${newStatus}`);
+      
+      if (!currentRecord) {
+        log('❌ Aucune tâche sélectionnée');
+        return;
+      }
+      
+      const rowId = currentRecord.id;
+      log('🔑 Row ID:', rowId);
+      log('🗺️ Mappings disponibles:', mappings);
+      
+      // Méthode 1 : Via docApi.applyUserActions
       try {
-        mappedColumns = mappings;
+        log('🔄 Essai Méthode 1: docApi.applyUserActions');
         
-        // Mapper les tâches
-        tasksData = records.map(record => {
-          const mapped = grist.mapColumnNames(record, mappings);
-          
-          // Normaliser le statut
-          let statutFinal = mapped.Statut || 'À faire';
-          
-          if (Array.isArray(statutFinal)) {
-            statutFinal = statutFinal[0] || 'À faire';
-          }
-          
-          if (typeof statutFinal === 'string') {
-            statutFinal = statutFinal.trim();
-          }
-          
-          return {
-            id: record.id,
-            tache: mapped.Tâche || '',
-            partenaire: mapped.Partenaire || null,
-            evenement: mapped.Evènement || null,
-            statut: statutFinal,
-            echeance: mapped.Echéance || null,
-            porteur: mapped.Porteur || '',
-            description: mapped.Description || ''
-          };
+        const tableName = '4. Tâches'; // NOM EXACT de votre table
+        const columnName = mappings && mappings.Statut ? mappings.Statut : 'Statut';
+        
+        log('📋 Paramètres:', { tableName, columnName, rowId, newStatus });
+        
+        await grist.docApi.applyUserActions([
+          ['UpdateRecord', tableName, rowId, { 
+            [columnName]: newStatus 
+          }]
+        ]);
+        
+        log('✅ Méthode 1 RÉUSSIE !');
+        return;
+        
+      } catch (error) {
+        log('❌ Méthode 1 échouée:', {
+          message: error.message,
+          stack: error.stack
         });
-        
-        renderKanban();
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('kanban-wrapper').style.display = 'block';
-      } catch (error) {
-        showError('Erreur lors du chargement: ' + error.message);
-        console.error('Erreur détaillée:', error);
-      }
-    });
-    
-    function renderKanban() {
-      const container = document.getElementById('kanban');
-      container.innerHTML = '';
-      
-      STATUTS.forEach(statut => {
-        const column = createColumn(statut);
-        container.appendChild(column);
-      });
-    }
-    
-    function createColumn(statut) {
-      const column = document.createElement('div');
-      column.className = 'kanban-column';
-      
-      const tasks = tasksData.filter(t => t.statut === statut);
-      
-      column.innerHTML = `
-        <div class="column-header">
-          <span>${statut}</span>
-          <span class="task-count">${tasks.length}</span>
-        </div>
-        <div class="tasks-list"></div>
-      `;
-      
-      const tasksList = column.querySelector('.tasks-list');
-      tasks.forEach(task => {
-        tasksList.appendChild(createTaskCard(task));
-      });
-      
-      return column;
-    }
-    
-    function createTaskCard(task) {
-      const card = document.createElement('div');
-      card.className = 'task-card';
-      card.dataset.taskId = task.id;
-      
-      // Afficher les valeurs
-      const partenaireDisplay = task.partenaire || 'Non défini';
-      const evenementDisplay = task.evenement || 'Non défini';
-      const echeance = task.echeance ? formatDate(task.echeance) : 'Non définie';
-      const porteur = task.porteur || 'Non assigné';
-      
-      card.innerHTML = `
-        <div class="task-partenaire">
-          <span>🤝</span>
-          <span>${partenaireDisplay}</span>
-        </div>
-        <div class="task-title">${task.tache}</div>
-        <div class="task-meta">
-          <div class="task-meta-row">
-            <span class="task-meta-label">🎯</span>
-            <span>${evenementDisplay}</span>
-          </div>
-          <div class="task-meta-row">
-            <span class="task-meta-label">📅</span>
-            <span>${echeance}</span>
-          </div>
-          <div class="task-meta-row">
-            <span class="task-meta-label">👤</span>
-            <span>${porteur}</span>
-          </div>
-        </div>
-      `;
-      
-      card.addEventListener('click', () => openModal(task));
-      
-      return card;
-    }
-    
-    function openModal(task) {
-      currentTaskId = task.id;
-      
-      document.getElementById('modal-partenaire').textContent = task.partenaire || 'Non défini';
-      document.getElementById('modal-tache').textContent = task.tache;
-      document.getElementById('modal-evenement').textContent = task.evenement || 'Non défini';
-      document.getElementById('modal-echeance').textContent = task.echeance ? formatDate(task.echeance) : 'Non définie';
-      document.getElementById('modal-porteur').textContent = task.porteur || 'Non assigné';
-      document.getElementById('modal-statut').value = task.statut;
-      
-      document.getElementById('modal').classList.add('active');
-    }
-    
-    function closeModal() {
-      document.getElementById('modal').classList.remove('active');
-      currentTaskId = null;
-    }
-    
-    function openInGrist() {
-      if (currentTaskId) {
-        grist.setCursorPos({ rowId: currentTaskId });
-        closeModal();
-      }
-    }
-    
-    async function saveStatut() {
-      if (!currentTaskId) return;
-      
-      const newStatut = document.getElementById('modal-statut').value;
-      const task = tasksData.find(t => t.id === currentTaskId);
-      
-      if (!task) {
-        showError('Tâche introuvable');
-        return;
       }
       
-      if (task.statut === newStatut) {
-        closeModal();
-        return;
-      }
-      
-      // Mettre à jour localement
-      task.statut = newStatut;
-      
-      // Ouvrir dans Grist pour validation
+      // Méthode 2 : Via setCursorPos (fallback)
       try {
-        await grist.setCursorPos({ rowId: currentTaskId });
-        showSuccess(`Statut changé vers "${newStatut}" • Validez dans Grist`);
-        closeModal();
-        renderKanban();
+        log('🔄 Essai Méthode 2: setCursorPos (manuel)');
+        await grist.setCursorPos({ rowId });
+        log('✅ Ligne ouverte. Changez manuellement le statut à: ' + newStatus);
       } catch (error) {
-        showError('Erreur: ' + error.message);
-        console.error('Erreur:', error);
+        log('❌ Méthode 2 échouée:', error);
       }
     }
-    
-    function formatDate(dateValue) {
-      if (!dateValue) return 'Non définie';
-      
-      let date;
-      if (typeof dateValue === 'number') {
-        date = new Date(dateValue * 1000);
-      } else {
-        date = new Date(dateValue);
-      }
-      
-      if (isNaN(date.getTime())) return 'Non définie';
-      
-      return date.toLocaleDateString('fr-FR');
-    }
-    
-    function showError(message) {
-      const errorDiv = document.getElementById('error');
-      errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
-      
-      setTimeout(() => {
-        errorDiv.style.display = 'none';
-      }, 5000);
-    }
-    
-    function showSuccess(message) {
-      const successDiv = document.getElementById('success');
-      successDiv.textContent = message;
-      successDiv.style.display = 'block';
-      
-      setTimeout(() => {
-        successDiv.style.display = 'none';
-      }, 3000);
-    }
-    
-    // Fermer le modal en cliquant à l'extérieur
-    document.getElementById('modal').addEventListener('click', function(e) {
-      if (e.target === this) {
-        closeModal();
-      }
-    });
   </script>
 </body>
 </html>
