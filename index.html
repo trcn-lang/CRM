@@ -78,11 +78,21 @@
       opacity: 0.5;
     }
     
+    .task-partenaire {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
     .task-title {
       font-weight: 600;
       color: #1e3a5f;
-      font-size: 13px;
-      margin-bottom: 6px;
+      font-size: 14px;
+      margin-bottom: 8px;
     }
     
     .task-meta {
@@ -95,7 +105,7 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-top: 3px;
+      margin-top: 4px;
     }
     
     .task-meta-label {
@@ -298,14 +308,22 @@
       card.draggable = true;
       card.dataset.taskId = task.id;
       
-      // Afficher les valeurs directement
-      const evenementDisplay = task.evenement || 'N/A';
-      const echeance = task.echeance ? formatDate(task.echeance) : 'N/A';
-      const porteur = task.porteur || 'N/A';
+      // Afficher les valeurs
+      const evenementDisplay = task.evenement || 'Non défini';
+      const echeance = task.echeance ? formatDate(task.echeance) : 'Non définie';
+      const porteur = task.porteur || 'Non assigné';
       
       card.innerHTML = `
+        <div class="task-partenaire">
+          <span>🤝</span>
+          <span>Partenaire</span>
+        </div>
         <div class="task-title">${task.tache}</div>
         <div class="task-meta">
+          <div class="task-meta-row">
+            <span class="task-meta-label">🎯</span>
+            <span>${evenementDisplay}</span>
+          </div>
           <div class="task-meta-row">
             <span class="task-meta-label">📅</span>
             <span>${echeance}</span>
@@ -313,10 +331,6 @@
           <div class="task-meta-row">
             <span class="task-meta-label">👤</span>
             <span>${porteur}</span>
-          </div>
-          <div class="task-meta-row">
-            <span class="task-meta-label">🎯</span>
-            <span>Événement: ${evenementDisplay}</span>
           </div>
         </div>
       `;
@@ -438,7 +452,7 @@
     }
     
     function formatDate(dateValue) {
-      if (!dateValue) return 'N/A';
+      if (!dateValue) return 'Non définie';
       
       // Grist peut retourner soit un timestamp, soit une date ISO
       let date;
@@ -448,7 +462,7 @@
         date = new Date(dateValue);
       }
       
-      if (isNaN(date.getTime())) return 'N/A';
+      if (isNaN(date.getTime())) return 'Non définie';
       
       return date.toLocaleDateString('fr-FR');
     }
