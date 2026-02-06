@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Test Modification Grist v3</title>
+  <title>Test Final</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
     body {
@@ -42,19 +42,14 @@
       border-radius: 6px;
       overflow-x: auto;
       font-size: 11px;
-      max-height: 300px;
-      overflow-y: auto;
     }
   </style>
 </head>
 <body>
-  <h1>🧪 Test v3 : Découverte automatique</h1>
+  <h1>🧪 Test FINAL avec getTable()</h1>
   
   <div class="info">
-    <strong>Ce test va :</strong><br>
-    1. Découvrir automatiquement le nom de la table<br>
-    2. Tester la modification<br>
-    3. Afficher tous les détails
+    <strong>Dernière tentative avec une API différente</strong>
   </div>
   
   <div id="current-task" class="task" style="display:none;">
@@ -74,7 +69,7 @@
   <script>
     let currentRecord = null;
     let mappings = null;
-    let tableId = null;
+    let selectedTable = null;
     
     function log(message, data = null) {
       const logsDiv = document.getElementById('logs');
@@ -91,39 +86,20 @@
     grist.ready({ requiredAccess: 'full' });
     log('✅ Widget initialisé');
     
-    // Récupérer l'ID de la table
-    grist.onOptions(async function(options, interaction) {
-      log('📦 Options reçues', { options, interaction });
-      
-      if (interaction && interaction.tableId) {
-        tableId = interaction.tableId;
-        log(`🎯 TABLE ID TROUVÉ: "${tableId}"`);
-      }
-      
-      // Essayer aussi de lister toutes les tables
-      try {
-        const tables = await grist.docApi.fetchTable('_grist_Tables');
-        log('📋 Tables disponibles dans le document:', tables);
-      } catch (e) {
-        log('⚠️ Impossible de lister les tables:', e.message);
-      }
+    // Récupérer la table sélectionnée
+    grist.getTable().then(table => {
+      selectedTable = table;
+      log('🎯 Table obtenue via grist.getTable():', table);
+    }).catch(err => {
+      log('❌ Erreur getTable():', err);
     });
     
     grist.onRecord(function(record, mappedRecord) {
-      log('📍 Ligne sélectionnée');
-      log('  - Record brut:', record);
-      log('  - Record mappé:', mappedRecord);
-      
+      log('📍 Ligne sélectionnée', { record, mappedRecord });
       currentRecord = record;
       
-      // Essayer de trouver le tableId depuis le record
-      if (record && record._table) {
-        tableId = record._table;
-        log(`🎯 TABLE ID depuis record: "${tableId}"`);
-      }
-      
-      const tache = mappedRecord.Tâche || 'Sans nom';
-      const statut = mappedRecord.Statut || 'Non défini';
+      const tache = record.Tache || 'Sans nom';
+      const statut = record.Statut ? record.Statut[0] : 'Non défini';
       
       document.getElementById('task-title').textContent = tache;
       document.getElementById('task-status').textContent = statut;
@@ -131,20 +107,12 @@
     });
     
     grist.onRecords(function(records, recordMappings) {
-      log('📊 Données chargées', { count: records.length });
+      log('📊 Données chargées', { count: records.length, mappings: recordMappings });
       mappings = recordMappings;
-      log('🗺️ Mappings:', mappings);
-      
-      if (records && records.length > 0 && records[0]._table) {
-        tableId = records[0]._table;
-        log(`🎯 TABLE ID depuis records[0]: "${tableId}"`);
-      }
     });
     
     async function changeStatus(newStatus) {
-      log(`\n========================================`);
-      log(`🎯 TENTATIVE DE CHANGEMENT VERS: "${newStatus}"`);
-      log(`========================================`);
+      log(`\n🎯 CHANGEMENT VERS: "${newStatus}"`);
       
       if (!currentRecord) {
         log('❌ Aucune tâche sélectionnée');
@@ -152,45 +120,36 @@
       }
       
       const rowId = currentRecord.id;
-      log('🔑 Row ID:', rowId);
-      log('🏷️ Table ID:', tableId);
-      log('🗺️ Mappings:', mappings);
+      log('Row ID:', rowId);
+      log('Table:', selectedTable);
       
-      if (!tableId) {
-        log('❌ TABLE ID NON TROUVÉ - Impossible de continuer');
-        return;
+      // Méthode avec selectedTable.update()
+      if (selectedTable) {
+        try {
+          log('🔄 Tentative avec selectedTable.update()');
+          
+          const columnName = mappings && mappings.Statut ? mappings.Statut : 'Statut';
+          log(`Colonne: "${columnName}"`);
+          
+          await selectedTable.update({
+            id: rowId,
+            [columnName]: newStatus
+          });
+          
+          log('✅ ✅ ✅ SUCCÈS ! ✅ ✅ ✅');
+          return;
+          
+        } catch (error) {
+          log('❌ Échec selectedTable.update():', { message: error.message, stack: error.stack });
+        }
       }
       
-      // Test avec le tableId trouvé
+      // Fallback
       try {
-        const columnName = mappings && mappings.Statut ? mappings.Statut : 'Statut';
-        
-        log(`📤 Envoi de la requête UpdateRecord:`);
-        log(`   - Table: "${tableId}"`);
-        log(`   - Row: ${rowId}`);
-        log(`   - Column: "${columnName}"`);
-        log(`   - Value: "${newStatus}"`);
-        
-        await grist.docApi.applyUserActions([
-          ['UpdateRecord', tableId, rowId, { 
-            [columnName]: newStatus 
-          }]
-        ]);
-        
-        log('✅ ✅ ✅ SUCCÈS ! La modification a fonctionné ! ✅ ✅ ✅');
-        
-      } catch (error) {
-        log('❌ ÉCHEC de la modification');
-        log('Message:', error.message);
-        log('Stack:', error.stack);
-        
-        // Fallback
-        try {
-          await grist.setCursorPos({ rowId });
-          log('📍 Ligne ouverte pour modification manuelle');
-        } catch (e) {
-          log('❌ Impossible même d\'ouvrir la ligne');
-        }
+        await grist.setCursorPos({ rowId });
+        log('📍 Ligne ouverte pour modification manuelle');
+      } catch (e) {
+        log('❌ Échec total');
       }
     }
   </script>
