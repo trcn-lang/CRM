@@ -65,17 +65,14 @@
       border: 1px solid #e2e8f0;
       border-radius: 6px;
       padding: 10px;
-      cursor: move;
+      cursor: pointer;
       transition: all 0.2s;
     }
     
     .task-card:hover {
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
       border-color: #2563eb;
-    }
-    
-    .task-card.dragging {
-      opacity: 0.5;
+      transform: translateY(-2px);
     }
     
     .task-partenaire {
@@ -130,9 +127,9 @@
     }
     
     .success-message {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
       padding: 12px;
       border-radius: 6px;
       margin: 16px;
@@ -155,6 +152,129 @@
       font-size: 13px;
       text-align: center;
     }
+    
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    }
+    
+    .modal-header {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .modal-field {
+      margin-bottom: 16px;
+    }
+    
+    .modal-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    
+    .modal-value {
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #1e3a5f;
+    }
+    
+    .modal-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #2563eb;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      background: white;
+      color: #1e3a5f;
+      cursor: pointer;
+    }
+    
+    .modal-select:focus {
+      outline: none;
+      border-color: #1d4ed8;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+    }
+    
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+    
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+    
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+    
+    .btn-edit {
+      background: #f59e0b;
+      color: white;
+    }
+    
+    .btn-edit:hover {
+      background: #d97706;
+    }
   </style>
 </head>
 <body>
@@ -163,14 +283,62 @@
   <div id="success" class="success-message"></div>
   <div id="kanban-wrapper" style="display: none;">
     <div class="info-banner">
-      💡 <strong>Glissez-déposez</strong> les cartes pour changer leur statut • La ligne s'ouvrira dans Grist pour valider • <strong>Cliquez</strong> sur une carte pour l'éditer
+      💡 <strong>Cliquez sur une carte</strong> pour voir les détails et changer le statut
     </div>
     <div id="kanban" class="kanban-container"></div>
+  </div>
+  
+  <!-- Modal pour voir/modifier une tâche -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Détails de la tâche</div>
+      
+      <div class="modal-field">
+        <div class="modal-label">🤝 Partenaire</div>
+        <div class="modal-value" id="modal-partenaire">-</div>
+      </div>
+      
+      <div class="modal-field">
+        <div class="modal-label">📋 Tâche</div>
+        <div class="modal-value" id="modal-tache">-</div>
+      </div>
+      
+      <div class="modal-field">
+        <div class="modal-label">🎯 Événement</div>
+        <div class="modal-value" id="modal-evenement">-</div>
+      </div>
+      
+      <div class="modal-field">
+        <div class="modal-label">📅 Échéance</div>
+        <div class="modal-value" id="modal-echeance">-</div>
+      </div>
+      
+      <div class="modal-field">
+        <div class="modal-label">👤 Porteur</div>
+        <div class="modal-value" id="modal-porteur">-</div>
+      </div>
+      
+      <div class="modal-field">
+        <div class="modal-label">📝 Statut</div>
+        <select id="modal-statut" class="modal-select">
+          <option value="À faire">À faire</option>
+          <option value="En cours">En cours</option>
+          <option value="Terminé">Terminé</option>
+        </select>
+      </div>
+      
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
+        <button class="btn btn-edit" onclick="openInGrist()">Éditer dans Grist</button>
+        <button class="btn btn-primary" onclick="saveStatut()">Sauvegarder</button>
+      </div>
+    </div>
   </div>
 
   <script>
     let tasksData = [];
     let mappedColumns = {};
+    let currentTaskId = null;
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
@@ -237,15 +405,11 @@
         const column = createColumn(statut);
         container.appendChild(column);
       });
-      
-      // Attacher les événements drag & drop après le rendu
-      attachDragAndDropEvents();
     }
     
     function createColumn(statut) {
       const column = document.createElement('div');
       column.className = 'kanban-column';
-      column.dataset.statut = statut;
       
       const tasks = tasksData.filter(t => t.statut === statut);
       
@@ -254,7 +418,7 @@
           <span>${statut}</span>
           <span class="task-count">${tasks.length}</span>
         </div>
-        <div class="tasks-list" data-statut="${statut}"></div>
+        <div class="tasks-list"></div>
       `;
       
       const tasksList = column.querySelector('.tasks-list');
@@ -268,7 +432,6 @@
     function createTaskCard(task) {
       const card = document.createElement('div');
       card.className = 'task-card';
-      card.draggable = true;
       card.dataset.taskId = task.id;
       
       // Afficher les valeurs
@@ -299,92 +462,65 @@
         </div>
       `;
       
+      card.addEventListener('click', () => openModal(task));
+      
       return card;
     }
     
-    function attachDragAndDropEvents() {
-      // Attacher dragstart à toutes les cartes
-      document.querySelectorAll('.task-card').forEach(card => {
-        card.addEventListener('dragstart', function(ev) {
-          ev.dataTransfer.setData('taskId', this.dataset.taskId);
-          this.classList.add('dragging');
-          console.log('Drag start:', this.dataset.taskId);
-        });
-        
-        card.addEventListener('dragend', function() {
-          this.classList.remove('dragging');
-          console.log('Drag end');
-        });
-        
-        card.addEventListener('click', function(e) {
-          // Ne pas ouvrir si on est en train de dragger
-          if (!this.classList.contains('dragging')) {
-            openTaskInGrist(parseInt(this.dataset.taskId));
-          }
-        });
-      });
+    function openModal(task) {
+      currentTaskId = task.id;
       
-      // Attacher dragover et drop à toutes les colonnes
-      document.querySelectorAll('.kanban-column').forEach(column => {
-        const list = column.querySelector('.tasks-list');
-        const statut = list.dataset.statut;
-        
-        // Accepter le drop sur toute la colonne
-        column.addEventListener('dragover', function(ev) {
-          ev.preventDefault();
-          ev.dataTransfer.dropEffect = 'move';
-        });
-        
-        list.addEventListener('dragover', function(ev) {
-          ev.preventDefault();
-          ev.dataTransfer.dropEffect = 'move';
-        });
-        
-        // Handler de drop
-        async function handleDrop(ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          
-          const taskId = parseInt(ev.dataTransfer.getData('taskId'));
-          const newStatut = statut;
-          
-          console.log('Drop:', taskId, 'vers', newStatut);
-          
-          const card = document.querySelector(`[data-task-id="${taskId}"]`);
-          if (card) card.classList.remove('dragging');
-          
-          const task = tasksData.find(t => t.id === taskId);
-          if (!task) {
-            showError('Tâche introuvable');
-            return;
-          }
-          
-          // Ne rien faire si le statut n'a pas changé
-          if (task.statut === newStatut) {
-            console.log('Même statut, rien à faire');
-            return;
-          }
-          
-          // Mettre à jour localement pour l'affichage immédiat
-          const oldStatut = task.statut;
-          task.statut = newStatut;
-          renderKanban();
-          
-          console.log('Changement:', oldStatut, '->', newStatut);
-          
-          // Ouvrir la ligne dans Grist
-          try {
-            await grist.setCursorPos({ rowId: taskId });
-            showInfo(`📝 Ligne ouverte • Changez le statut à "${newStatut}"`);
-          } catch (error) {
-            console.error('Erreur setCursorPos:', error);
-            showError('Veuillez mettre à jour le statut manuellement dans Grist.');
-          }
-        }
-        
-        column.addEventListener('drop', handleDrop);
-        list.addEventListener('drop', handleDrop);
-      });
+      document.getElementById('modal-partenaire').textContent = task.partenaire || 'Non défini';
+      document.getElementById('modal-tache').textContent = task.tache;
+      document.getElementById('modal-evenement').textContent = task.evenement || 'Non défini';
+      document.getElementById('modal-echeance').textContent = task.echeance ? formatDate(task.echeance) : 'Non définie';
+      document.getElementById('modal-porteur').textContent = task.porteur || 'Non assigné';
+      document.getElementById('modal-statut').value = task.statut;
+      
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+      currentTaskId = null;
+    }
+    
+    function openInGrist() {
+      if (currentTaskId) {
+        grist.setCursorPos({ rowId: currentTaskId });
+        closeModal();
+      }
+    }
+    
+    async function saveStatut() {
+      if (!currentTaskId) return;
+      
+      const newStatut = document.getElementById('modal-statut').value;
+      const task = tasksData.find(t => t.id === currentTaskId);
+      
+      if (!task) {
+        showError('Tâche introuvable');
+        return;
+      }
+      
+      if (task.statut === newStatut) {
+        closeModal();
+        return;
+      }
+      
+      // Mettre à jour localement
+      task.statut = newStatut;
+      
+      // Ouvrir dans Grist pour validation
+      try {
+        await grist.setCursorPos({ rowId: currentTaskId });
+        showSuccess(`Statut changé vers "${newStatut}" • Validez dans Grist`);
+        closeModal();
+        renderKanban();
+      } catch (error) {
+        showError('Erreur: ' + error.message);
+        console.error('Erreur:', error);
+      }
     }
     
     function formatDate(dateValue) {
@@ -402,10 +538,6 @@
       return date.toLocaleDateString('fr-FR');
     }
     
-    function openTaskInGrist(taskId) {
-      grist.setCursorPos({ rowId: taskId });
-    }
-    
     function showError(message) {
       const errorDiv = document.getElementById('error');
       errorDiv.textContent = message;
@@ -416,15 +548,22 @@
       }, 5000);
     }
     
-    function showInfo(message) {
+    function showSuccess(message) {
       const successDiv = document.getElementById('success');
       successDiv.textContent = message;
       successDiv.style.display = 'block';
       
       setTimeout(() => {
         successDiv.style.display = 'none';
-      }, 4000);
+      }, 3000);
     }
+    
+    // Fermer le modal en cliquant à l'extérieur
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
   </script>
 </body>
 </html>
