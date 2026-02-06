@@ -130,9 +130,9 @@
     }
     
     .success-message {
-      background: #f0fdf4;
-      border: 1px solid #86efac;
-      color: #166534;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
       padding: 12px;
       border-radius: 6px;
       margin: 16px;
@@ -163,7 +163,7 @@
   <div id="success" class="success-message"></div>
   <div id="kanban-wrapper" style="display: none;">
     <div class="info-banner">
-      💡 <strong>Glissez-déposez</strong> les cartes pour changer leur statut • <strong>Cliquez</strong> sur une carte pour l'éditer dans Grist
+      💡 <strong>Glissez-déposez</strong> les cartes pour changer leur statut • La ligne s'ouvrira dans Grist pour valider • <strong>Cliquez</strong> sur une carte pour l'éditer
     </div>
     <div id="kanban" class="kanban-container"></div>
   </div>
@@ -193,10 +193,6 @@
       try {
         mappedColumns = mappings;
         
-        console.log('=== DEBUG DÉMARRAGE ===');
-        console.log('Nombre de records:', records.length);
-        console.log('Mappings:', mappings);
-        
         // Mapper les tâches
         tasksData = records.map(record => {
           const mapped = grist.mapColumnNames(record, mappings);
@@ -222,13 +218,6 @@
             porteur: mapped.Porteur || '',
             description: mapped.Description || ''
           };
-        });
-        
-        console.log('=== RÉSUMÉ TÂCHES ===');
-        console.log('Tâches par statut:');
-        STATUTS.forEach(statut => {
-          const count = tasksData.filter(t => t.statut === statut).length;
-          console.log(`  ${statut}: ${count} tâches`);
         });
         
         renderKanban();
@@ -319,20 +308,23 @@
         card.addEventListener('dragstart', function(ev) {
           ev.dataTransfer.setData('taskId', this.dataset.taskId);
           this.classList.add('dragging');
+          console.log('Drag start:', this.dataset.taskId);
         });
         
         card.addEventListener('dragend', function() {
           this.classList.remove('dragging');
+          console.log('Drag end');
         });
         
-        card.addEventListener('click', function() {
+        card.addEventListener('click', function(e) {
+          // Ne pas ouvrir si on est en train de dragger
           if (!this.classList.contains('dragging')) {
             openTaskInGrist(parseInt(this.dataset.taskId));
           }
         });
       });
       
-      // Attacher dragover et drop à toutes les colonnes ET listes
+      // Attacher dragover et drop à toutes les colonnes
       document.querySelectorAll('.kanban-column').forEach(column => {
         const list = column.querySelector('.tasks-list');
         const statut = list.dataset.statut;
@@ -348,13 +340,15 @@
           ev.dataTransfer.dropEffect = 'move';
         });
         
-        // Handler de drop sur la colonne entière - VERSION SIMPLIFIÉE
-        const dropHandler = async function(ev) {
+        // Handler de drop
+        async function handleDrop(ev) {
           ev.preventDefault();
           ev.stopPropagation();
           
           const taskId = parseInt(ev.dataTransfer.getData('taskId'));
           const newStatut = statut;
+          
+          console.log('Drop:', taskId, 'vers', newStatut);
           
           const card = document.querySelector(`[data-task-id="${taskId}"]`);
           if (card) card.classList.remove('dragging');
@@ -367,30 +361,29 @@
           
           // Ne rien faire si le statut n'a pas changé
           if (task.statut === newStatut) {
+            console.log('Même statut, rien à faire');
             return;
           }
           
-          console.log('=== DRAG & DROP ===');
-          console.log('Task ID:', taskId);
-          console.log('Ancien statut:', task.statut);
-          console.log('Nouveau statut:', newStatut);
-          
           // Mettre à jour localement pour l'affichage immédiat
+          const oldStatut = task.statut;
           task.statut = newStatut;
           renderKanban();
           
-          // Ouvrir la ligne dans Grist pour que l'utilisateur valide
+          console.log('Changement:', oldStatut, '->', newStatut);
+          
+          // Ouvrir la ligne dans Grist
           try {
             await grist.setCursorPos({ rowId: taskId });
-            showSuccess(`Carte déplacée ! Validez le nouveau statut "${newStatut}" dans Grist.`);
+            showInfo(`📝 Ligne ouverte • Changez le statut à "${newStatut}"`);
           } catch (error) {
             console.error('Erreur setCursorPos:', error);
-            showError('Carte déplacée visuellement, mais veuillez mettre à jour le statut manuellement dans Grist.');
+            showError('Veuillez mettre à jour le statut manuellement dans Grist.');
           }
-        };
+        }
         
-        column.addEventListener('drop', dropHandler);
-        list.addEventListener('drop', dropHandler);
+        column.addEventListener('drop', handleDrop);
+        list.addEventListener('drop', handleDrop);
       });
     }
     
@@ -423,14 +416,14 @@
       }, 5000);
     }
     
-    function showSuccess(message) {
+    function showInfo(message) {
       const successDiv = document.getElementById('success');
       successDiv.textContent = message;
       successDiv.style.display = 'block';
       
       setTimeout(() => {
         successDiv.style.display = 'none';
-      }, 3000);
+      }, 4000);
     }
   </script>
 </body>
