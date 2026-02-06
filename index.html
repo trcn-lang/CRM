@@ -2,156 +2,473 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Test Final</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban CRM</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
     body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f5f5f5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f5f7fa;
+      padding: 16px;
+      overflow-x: auto;
     }
-    .task {
-      background: white;
-      padding: 15px;
-      margin: 10px 0;
+    
+    .kanban-container {
+      display: flex;
+      gap: 16px;
+      min-width: fit-content;
+    }
+    
+    .kanban-column {
+      background: #fff;
       border-radius: 8px;
-      border: 2px solid #ddd;
+      width: 320px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    button {
-      padding: 10px 20px;
-      margin: 5px;
+    
+    .column-header {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1e3a5f;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #2563eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .task-count {
+      background: #2563eb;
+      color: white;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+    }
+    
+    .tasks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 100px;
+    }
+    
+    .task-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .task-card:hover {
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+      border-color: #2563eb;
+      transform: translateY(-2px);
+    }
+    
+    .task-partenaire {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .task-title {
+      font-weight: 600;
+      color: #1e3a5f;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    
+    .task-meta {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    
+    .task-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+    
+    .info-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      text-align: center;
+    }
+    
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 550px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+    }
+    
+    .modal-header {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      background: white;
+    }
+    
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .btn {
+      padding: 12px 20px;
       border: none;
       border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
-      font-weight: bold;
+      transition: all 0.2s;
+      flex: 1;
     }
-    .btn-todo { background: #fef3c7; }
-    .btn-progress { background: #dbeafe; }
-    .btn-done { background: #d1fae5; }
-    .info {
-      background: #eff6ff;
-      padding: 15px;
-      margin: 20px 0;
+    
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+    
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+    
+    .success-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
       border-radius: 8px;
-      border: 1px solid #bfdbfe;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none;
+      z-index: 2000;
+      font-weight: 500;
     }
-    pre {
-      background: #1e293b;
-      color: #e2e8f0;
-      padding: 10px;
-      border-radius: 6px;
-      overflow-x: auto;
-      font-size: 11px;
+    
+    .success-toast.show {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
   </style>
 </head>
 <body>
-  <h1>🧪 Test FINAL avec getTable()</h1>
+  <div id="loading" class="loading">Chargement...</div>
+  <div id="success-toast" class="success-toast"></div>
   
-  <div class="info">
-    <strong>Dernière tentative avec une API différente</strong>
-  </div>
-  
-  <div id="current-task" class="task" style="display:none;">
-    <h3 id="task-title">-</h3>
-    <p><strong>Statut actuel :</strong> <span id="task-status">-</span></p>
-    <div>
-      <button class="btn-todo" onclick="changeStatus('À faire')">À faire</button>
-      <button class="btn-progress" onclick="changeStatus('En cours')">En cours</button>
-      <button class="btn-done" onclick="changeStatus('Terminé')">Terminé</button>
+  <div id="kanban-wrapper" style="display: none;">
+    <div class="info-banner">
+      💡 <strong>Cliquez sur une carte</strong> pour modifier tous les détails
     </div>
+    <div id="kanban" class="kanban-container"></div>
   </div>
   
-  <div id="logs">
-    <h3>📋 Logs</h3>
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Modifier la tâche</div>
+      <form id="task-form">
+        <div class="form-group">
+          <label class="form-label">🤝 Partenaire</label>
+          <input type="text" id="input-partenaire" class="form-input" placeholder="Nom du partenaire">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">📋 Tâche</label>
+          <input type="text" id="input-tache" class="form-input" placeholder="Nom de la tâche" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">🎯 Événement</label>
+          <input type="text" id="input-evenement" class="form-input" placeholder="Événement associé">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">📅 Échéance</label>
+          <input type="date" id="input-echeance" class="form-input">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">👤 Porteur</label>
+          <input type="text" id="input-porteur" class="form-input" placeholder="Responsable">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">📝 Statut</label>
+          <select id="input-statut" class="form-select">
+            <option value="À faire">À faire</option>
+            <option value="En cours">En cours</option>
+            <option value="Terminé">Terminé</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">📄 Description</label>
+          <textarea id="input-description" class="form-textarea" placeholder="Description..."></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+          <button type="submit" class="btn btn-primary">💾 Sauvegarder</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
-    let currentRecord = null;
-    let mappings = null;
-    let selectedTable = null;
-    
-    function log(message, data = null) {
-      const logsDiv = document.getElementById('logs');
-      const time = new Date().toLocaleTimeString();
-      const logEntry = document.createElement('pre');
-      logEntry.textContent = `[${time}] ${message}`;
-      if (data) {
-        logEntry.textContent += '\n' + JSON.stringify(data, null, 2);
-      }
-      logsDiv.appendChild(logEntry);
-      console.log(message, data);
-    }
+    let tasksData = [];
+    let currentTaskId = null;
+    const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
     grist.ready({ requiredAccess: 'full' });
-    log('✅ Widget initialisé');
     
-    // Récupérer la table sélectionnée
-    grist.getTable().then(table => {
-      selectedTable = table;
-      log('🎯 Table obtenue via grist.getTable():', table);
-    }).catch(err => {
-      log('❌ Erreur getTable():', err);
+    // Charger les données
+    grist.onRecords(function(records) {
+      tasksData = records.map(r => ({
+        id: r.id,
+        Tache: r.Tache || '',
+        Partenaire: r.Partenaire || '',
+        Evenement: r.Evenement || '',
+        Statut: r.Statut || 'À faire',
+        Echeance: r.Echeance || null,
+        Porteur: r.Porteur || '',
+        Description: r.Description || ''
+      }));
+      
+      renderKanban();
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('kanban-wrapper').style.display = 'block';
     });
     
-    grist.onRecord(function(record, mappedRecord) {
-      log('📍 Ligne sélectionnée', { record, mappedRecord });
-      currentRecord = record;
+    function renderKanban() {
+      const container = document.getElementById('kanban');
+      container.innerHTML = '';
       
-      const tache = record.Tache || 'Sans nom';
-      const statut = record.Statut ? record.Statut[0] : 'Non défini';
-      
-      document.getElementById('task-title').textContent = tache;
-      document.getElementById('task-status').textContent = statut;
-      document.getElementById('current-task').style.display = 'block';
-    });
-    
-    grist.onRecords(function(records, recordMappings) {
-      log('📊 Données chargées', { count: records.length, mappings: recordMappings });
-      mappings = recordMappings;
-    });
-    
-    async function changeStatus(newStatus) {
-      log(`\n🎯 CHANGEMENT VERS: "${newStatus}"`);
-      
-      if (!currentRecord) {
-        log('❌ Aucune tâche sélectionnée');
-        return;
-      }
-      
-      const rowId = currentRecord.id;
-      log('Row ID:', rowId);
-      log('Table:', selectedTable);
-      
-      // Méthode avec selectedTable.update()
-      if (selectedTable) {
-        try {
-          log('🔄 Tentative avec selectedTable.update()');
+      STATUTS.forEach(statut => {
+        const column = document.createElement('div');
+        column.className = 'kanban-column';
+        
+        const tasks = tasksData.filter(t => t.Statut === statut);
+        
+        column.innerHTML = `
+          <div class="column-header">
+            <span>${statut}</span>
+            <span class="task-count">${tasks.length}</span>
+          </div>
+          <div class="tasks-list"></div>
+        `;
+        
+        const tasksList = column.querySelector('.tasks-list');
+        tasks.forEach(task => {
+          const card = document.createElement('div');
+          card.className = 'task-card';
+          card.onclick = () => openModal(task);
           
-          const columnName = mappings && mappings.Statut ? mappings.Statut : 'Statut';
-          log(`Colonne: "${columnName}"`);
+          const echeance = task.Echeance ? formatDate(task.Echeance) : 'Non définie';
           
-          await selectedTable.update({
-            id: rowId,
-            [columnName]: newStatus
-          });
+          card.innerHTML = `
+            <div class="task-partenaire">🤝 ${task.Partenaire || 'Non défini'}</div>
+            <div class="task-title">${task.Tache}</div>
+            <div class="task-meta">
+              <div class="task-meta-row">🎯 ${task.Evenement || 'Non défini'}</div>
+              <div class="task-meta-row">📅 ${echeance}</div>
+              <div class="task-meta-row">👤 ${task.Porteur || 'Non assigné'}</div>
+            </div>
+          `;
           
-          log('✅ ✅ ✅ SUCCÈS ! ✅ ✅ ✅');
-          return;
-          
-        } catch (error) {
-          log('❌ Échec selectedTable.update():', { message: error.message, stack: error.stack });
-        }
-      }
-      
-      // Fallback
-      try {
-        await grist.setCursorPos({ rowId });
-        log('📍 Ligne ouverte pour modification manuelle');
-      } catch (e) {
-        log('❌ Échec total');
-      }
+          tasksList.appendChild(card);
+        });
+        
+        container.appendChild(column);
+      });
     }
+    
+    function openModal(task) {
+      currentTaskId = task.id;
+      
+      document.getElementById('input-partenaire').value = task.Partenaire || '';
+      document.getElementById('input-tache').value = task.Tache || '';
+      document.getElementById('input-evenement').value = task.Evenement || '';
+      document.getElementById('input-echeance').value = task.Echeance ? formatDateInput(task.Echeance) : '';
+      document.getElementById('input-porteur').value = task.Porteur || '';
+      document.getElementById('input-statut').value = task.Statut || 'À faire';
+      document.getElementById('input-description').value = task.Description || '';
+      
+      document.getElementById('modal').classList.add('active');
+    }
+    
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+      currentTaskId = null;
+    }
+    
+    // Sauvegarde avec BulkUpdateRecord comme le widget communautaire
+    document.getElementById('task-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      if (!currentTaskId) return;
+      
+      const updates = {
+        Tache: document.getElementById('input-tache').value,
+        Partenaire: document.getElementById('input-partenaire').value,
+        Evenement: document.getElementById('input-evenement').value,
+        Echeance: document.getElementById('input-echeance').value || null,
+        Porteur: document.getElementById('input-porteur').value,
+        Statut: document.getElementById('input-statut').value,
+        Description: document.getElementById('input-description').value
+      };
+      
+      try {
+        // Utiliser BulkUpdateRecord comme le widget communautaire
+        await grist.docApi.applyUserActions([
+          ['BulkUpdateRecord', 'Taches', [currentTaskId], updates]
+        ]);
+        
+        // Mettre à jour localement
+        const task = tasksData.find(t => t.id === currentTaskId);
+        if (task) {
+          Object.assign(task, updates);
+        }
+        
+        showSuccess('✅ Tâche mise à jour !');
+        closeModal();
+        renderKanban();
+        
+      } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur lors de la sauvegarde: ' + error.message);
+      }
+    });
+    
+    function formatDate(dateValue) {
+      if (!dateValue) return 'Non définie';
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return 'Non définie';
+      return date.toLocaleDateString('fr-FR');
+    }
+    
+    function formatDateInput(dateValue) {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    }
+    
+    function showSuccess(message) {
+      const toast = document.getElementById('success-toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+    
+    // Fermer modal en cliquant dehors
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
   </script>
 </body>
 </html>
