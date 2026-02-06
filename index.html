@@ -205,9 +205,6 @@
           console.log('Tâche:', mapped.Tâche);
           console.log('Statut brut:', mapped.Statut);
           console.log('Type de Statut:', typeof mapped.Statut);
-          console.log('Statut est null?', mapped.Statut === null);
-          console.log('Statut est undefined?', mapped.Statut === undefined);
-          console.log('Statut vide?', mapped.Statut === '');
           
           // Normaliser le statut
           let statutFinal = mapped.Statut || 'À faire';
@@ -267,6 +264,9 @@
         const column = createColumn(statut);
         container.appendChild(column);
       });
+      
+      // Attacher les événements drag & drop après le rendu
+      attachDragAndDropEvents();
     }
     
     function createColumn(statut) {
@@ -281,7 +281,7 @@
           <span>${statut}</span>
           <span class="task-count">${tasks.length}</span>
         </div>
-        <div class="tasks-list" ondrop="drop(event)" ondragover="allowDrop(event)" data-statut="${statut}"></div>
+        <div class="tasks-list" data-statut="${statut}"></div>
       `;
       
       const tasksList = column.querySelector('.tasks-list');
@@ -321,15 +321,104 @@
         </div>
       `;
       
-      card.addEventListener('dragstart', drag);
-      card.addEventListener('click', (e) => {
-        // Éviter d'ouvrir pendant le drag
-        if (!card.classList.contains('dragging')) {
-          openTaskInGrist(task.id);
-        }
+      return card;
+    }
+    
+    function attachDragAndDropEvents() {
+      // Attacher dragstart à toutes les cartes
+      document.querySelectorAll('.task-card').forEach(card => {
+        card.addEventListener('dragstart', function(ev) {
+          ev.dataTransfer.setData('taskId', this.dataset.taskId);
+          this.classList.add('dragging');
+        });
+        
+        card.addEventListener('dragend', function() {
+          this.classList.remove('dragging');
+        });
+        
+        card.addEventListener('click', function() {
+          if (!this.classList.contains('dragging')) {
+            openTaskInGrist(parseInt(this.dataset.taskId));
+          }
+        });
       });
       
-      return card;
+      // Attacher dragover et drop à toutes les listes
+      document.querySelectorAll('.tasks-list').forEach(list => {
+        list.addEventListener('dragover', function(ev) {
+          ev.preventDefault();
+        });
+        
+        list.addEventListener('drop', async function(ev) {
+          ev.preventDefault();
+          const taskId = parseInt(ev.dataTransfer.getData('taskId'));
+          const newStatut = this.dataset.statut;
+          
+          const card = document.querySelector(`[data-task-id="${taskId}"]`);
+          if (card) card.classList.remove('dragging');
+          
+          const task = tasksData.find(t => t.id === taskId);
+          if (!task) {
+            showError('Tâche introuvable');
+            return;
+          }
+          
+          // Ne rien faire si le statut n'a pas changé
+          if (task.statut === newStatut) {
+            return;
+          }
+          
+          console.log('=== TENTATIVE DE MISE À JOUR ===');
+          console.log('Task ID:', taskId);
+          console.log('Ancien statut:', task.statut);
+          console.log('Nouveau statut:', newStatut);
+          console.log('Table ID:', tableId);
+          console.log('Mapping Statut:', mappedColumns.Statut);
+          
+          try {
+            // Méthode 1 : Essayer avec docApi
+            try {
+              await grist.docApi.applyUserActions([
+                ['UpdateRecord', tableId, taskId, { 
+                  [mappedColumns.Statut]: newStatut 
+                }]
+              ]);
+              
+              task.statut = newStatut;
+              showSuccess(`Statut changé : ${newStatut} ✓`);
+              renderKanban();
+              console.log('✓ Méthode 1 réussie');
+              return;
+            } catch (e) {
+              console.log('✗ Méthode 1 échouée:', e.message);
+            }
+            
+            // Méthode 2 : Utiliser setters si disponibles
+            try {
+              await grist.selectedTable.update(taskId, {
+                [mappedColumns.Statut]: newStatut
+              });
+              
+              task.statut = newStatut;
+              showSuccess(`Statut changé : ${newStatut} ✓`);
+              renderKanban();
+              console.log('✓ Méthode 2 réussie');
+              return;
+            } catch (e) {
+              console.log('✗ Méthode 2 échouée:', e.message);
+            }
+            
+            // Méthode 3 : Sélectionner et demander à l'utilisateur
+            await grist.setCursorPos({ rowId: taskId });
+            showError('Veuillez changer le statut manuellement dans Grist à : ' + newStatut);
+            console.log('✗ Toutes les méthodes ont échoué, action manuelle requise');
+            
+          } catch (error) {
+            showError('Erreur: ' + error.message);
+            console.error('Erreur détaillée:', error);
+          }
+        });
+      });
     }
     
     function formatDate(dateValue) {
@@ -346,87 +435,6 @@
       if (isNaN(date.getTime())) return 'N/A';
       
       return date.toLocaleDateString('fr-FR');
-    }
-    
-    // Drag and drop
-    function allowDrop(ev) {
-      ev.preventDefault();
-    }
-    
-    function drag(ev) {
-      ev.dataTransfer.setData('taskId', ev.target.dataset.taskId);
-      ev.target.classList.add('dragging');
-    }
-    
-    async function drop(ev) {
-      ev.preventDefault();
-      const taskId = parseInt(ev.dataTransfer.getData('taskId'));
-      const tasksList = ev.target.closest('.tasks-list');
-      const newStatut = tasksList.dataset.statut;
-      
-      const card = document.querySelector(`[data-task-id="${taskId}"]`);
-      if (card) card.classList.remove('dragging');
-      
-      const task = tasksData.find(t => t.id === taskId);
-      if (!task) {
-        showError('Tâche introuvable');
-        return;
-      }
-      
-      // Ne rien faire si le statut n'a pas changé
-      if (task.statut === newStatut) {
-        return;
-      }
-      
-      console.log('=== TENTATIVE DE MISE À JOUR ===');
-      console.log('Task ID:', taskId);
-      console.log('Ancien statut:', task.statut);
-      console.log('Nouveau statut:', newStatut);
-      console.log('Table ID:', tableId);
-      console.log('Mapping Statut:', mappedColumns.Statut);
-      
-      try {
-        // Méthode 1 : Essayer avec docApi
-        try {
-          await grist.docApi.applyUserActions([
-            ['UpdateRecord', tableId, taskId, { 
-              [mappedColumns.Statut]: newStatut 
-            }]
-          ]);
-          
-          task.statut = newStatut;
-          showSuccess(`Statut changé : ${newStatut} ✓`);
-          renderKanban();
-          console.log('✓ Méthode 1 réussie');
-          return;
-        } catch (e) {
-          console.log('✗ Méthode 1 échouée:', e.message);
-        }
-        
-        // Méthode 2 : Utiliser setters si disponibles
-        try {
-          await grist.selectedTable.update(taskId, {
-            [mappedColumns.Statut]: newStatut
-          });
-          
-          task.statut = newStatut;
-          showSuccess(`Statut changé : ${newStatut} ✓`);
-          renderKanban();
-          console.log('✓ Méthode 2 réussie');
-          return;
-        } catch (e) {
-          console.log('✗ Méthode 2 échouée:', e.message);
-        }
-        
-        // Méthode 3 : Sélectionner et demander à l'utilisateur
-        await grist.setCursorPos({ rowId: taskId });
-        showError('Veuillez changer le statut manuellement dans Grist à : ' + newStatut);
-        console.log('✗ Toutes les méthodes ont échoué, action manuelle requise');
-        
-      } catch (error) {
-        showError('Erreur: ' + error.message);
-        console.error('Erreur détaillée:', error);
-      }
     }
     
     function openTaskInGrist(taskId) {
