@@ -302,7 +302,7 @@
     let tasksData = [];
     let evenementsData = [];
     let partenairesData = [];
-    let tableId = null;
+    let mappedColumns = {};
     
     const STATUTS = ['À faire', 'En cours', 'Terminé'];
     
@@ -319,44 +319,60 @@
       ]
     });
     
-    // Charger toutes les données
+    // Charger les données des tâches
     grist.onRecords(async function(records, mappings) {
       try {
-        tableId = await grist.getTableId();
+        mappedColumns = mappings;
         
-        // Charger les tâches
-        tasksData = records.map(record => ({
-          id: record.id,
-          tache: grist.getRecord(record, mappings, 'Tâche'),
-          evenement: grist.getRecord(record, mappings, 'Evènement'),
-          statut: grist.getRecord(record, mappings, 'Statut') || 'À faire',
-          echeance: grist.getRecord(record, mappings, 'Echéance'),
-          porteur: grist.getRecord(record, mappings, 'Porteur'),
-          description: grist.getRecord(record, mappings, 'Description')
-        }));
+        // Mapper les tâches
+        tasksData = records.map(record => {
+          const mapped = grist.mapColumnNames(record, mappings);
+          return {
+            id: record.id,
+            tache: mapped.Tâche || '',
+            evenement: mapped.Evènement || null,
+            statut: mapped.Statut || 'À faire',
+            echeance: mapped.Echéance || null,
+            porteur: mapped.Porteur || '',
+            description: mapped.Description || ''
+          };
+        });
         
-        // Charger événements et partenaires
+        // Charger les tables liées
         await loadRelatedData();
         
         renderKanban();
         document.getElementById('loading').style.display = 'none';
         document.getElementById('kanban').style.display = 'flex';
       } catch (error) {
-        showError('Erreur lors du chargement des données: ' + error.message);
+        showError('Erreur lors du chargement: ' + error.message);
+        console.error('Erreur détaillée:', error);
       }
     });
     
     async function loadRelatedData() {
       try {
-        // Charger les événements
-        const evenementsTable = await grist.getTable('3. Evènements');
-        evenementsData = await grist.fetchTable('3. Evènements') || [];
+        // Charger les événements via fetchSelectedTable
+        const evenementsResult = await grist.docApi.fetchTable('3. Evènements');
+        if (evenementsResult) {
+          evenementsData = evenementsResult.id.map((id, index) => ({
+            id: id,
+            Evènement: evenementsResult['Evènement'] ? evenementsResult['Evènement'][index] : '',
+            Partenaire: evenementsResult['Partenaire'] ? evenementsResult['Partenaire'][index] : null
+          }));
+        }
         
         // Charger les partenaires
-        const partenairesTable = await grist.getTable('1. BDD partenaires');
-        partenairesData = await grist.fetchTable('1. BDD partenaires') || [];
+        const partenairesResult = await grist.docApi.fetchTable('1. BDD partenaires');
+        if (partenairesResult) {
+          partenairesData = partenairesResult.id.map((id, index) => ({
+            id: id,
+            Partenaire: partenairesResult['Partenaire'] ? partenairesResult['Partenaire'][index] : ''
+          }));
+        }
       } catch (error) {
         console.error('Erreur chargement données liées:', error);
+        showError('Impossible de charger les événements et partenaires: ' + error.message);
       }
     }
     
@@ -447,7 +463,17 @@
     
     function formatDate(dateValue) {
       if (!dateValue) return 'N/A';
-      const date = new Date(dateValue * 1000); // Grist utilise timestamps Unix
+      
+      // Grist peut retourner soit un timestamp, soit une date ISO
+      let date;
+      if (typeof dateValue === 'number') {
+        date = new Date(dateValue * 1000);
+      } else {
+        date = new Date(dateValue);
+      }
+      
+      if (isNaN(date.getTime())) return 'N/A';
+      
       return date.toLocaleDateString('fr-FR');
     }
     
@@ -471,10 +497,10 @@
       if (card) card.classList.remove('dragging');
       
       try {
-        await grist.getTable(tableId).update({
-          id: taskId,
-          Statut: newStatut
-        });
+        // Utiliser l'API docApi pour mettre à jour
+        await grist.docApi.applyUserActions([
+          ['UpdateRecord', '4. Tâches', taskId, { Statut: newStatut }]
+        ]);
         
         // Mettre à jour les données locales
         const task = tasksData.find(t => t.id === taskId);
@@ -483,6 +509,7 @@
         renderKanban();
       } catch (error) {
         showError('Erreur lors du changement de statut: ' + error.message);
+        console.error('Erreur détaillée:', error);
       }
     }
     
@@ -548,23 +575,27 @@
       const description = document.getElementById('description-input').value;
       
       try {
-        // Convertir la date en timestamp Unix (Grist utilise ce format)
+        // Convertir la date en timestamp Unix
         const dateObj = new Date(echeance);
         const timestamp = Math.floor(dateObj.getTime() / 1000);
         
-        await grist.getTable(tableId).create({
-          Tâche: tache,
-          Evènement: evenementId,
-          Statut: currentStatut,
-          Echéance: timestamp,
-          Porteur: porteur,
-          Description: description
-        });
+        // Créer la nouvelle tâche via docApi
+        await grist.docApi.applyUserActions([
+          ['AddRecord', '4. Tâches', null, {
+            Tâche: tache,
+            Evènement: evenementId,
+            Statut: currentStatut,
+            Echéance: timestamp,
+            Porteur: porteur,
+            Description: description
+          }]
+        ]);
         
         closeModal();
       } catch (error) {
         document.getElementById('modal-error').textContent = 'Erreur lors de la création: ' + error.message;
         document.getElementById('modal-error').style.display = 'block';
+        console.error('Erreur détaillée:', error);
       }
     });
     
